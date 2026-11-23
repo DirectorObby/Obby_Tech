@@ -110,18 +110,12 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
         className="relative overflow-hidden bg-[#0C0826] text-white border border-slate-800 shadow-sm cursor-pointer group"
       >
         {bgImage ? (
-          <>
-            <img
-              src={bgImage}
-              alt={headline}
-              referrerPolicy="no-referrer"
-              className="absolute inset-0 w-full h-full object-cover object-center opacity-45 group-hover:scale-[1.02] transition-transform duration-500"
-            />
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 bg-gradient-to-r from-[#0C0826]/92 via-[#0C0826]/75 to-[#0C0826]/45 pointer-events-none"
-            />
-          </>
+          <img
+            src={bgImage}
+            alt={headline}
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-100 group-hover:scale-[1.02] transition-transform duration-500"
+          />
         ) : (
           <>
             <div
@@ -137,13 +131,13 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
 
         <div className="relative z-10 p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
           <div className="space-y-2 max-w-xl">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#29C5F6]">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#29C5F6] [text-shadow:0_1px_4px_rgba(12,8,38,0.85)]">
               {kicker}
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-snug">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-snug [text-shadow:0_2px_8px_rgba(12,8,38,0.85)]">
               {headline}
             </h2>
-            <p className="text-xs sm:text-[13px] text-slate-300 leading-relaxed">
+            <p className="text-xs sm:text-[13px] text-white/95 leading-relaxed [text-shadow:0_1px_6px_rgba(12,8,38,0.85)]">
               {subtitle}
             </p>
           </div>

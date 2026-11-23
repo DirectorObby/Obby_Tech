@@ -583,7 +583,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  // Banner helpers — automatically resize/crop uploaded banners to crisp 16:9 (1280x720)
+  // Banner helpers — preserve exact original uploaded banner photo in full crisp quality
   const handleBannerImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingBanner) return;
@@ -591,59 +591,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     reader.onload = (evt) => {
       const dataUrl = evt.target?.result as string;
       if (!dataUrl) return;
-
-      const img = new Image();
-      img.onload = () => {
-        const targetW = 1280;
-        const targetH = 720;
-        const canvas = document.createElement('canvas');
-        canvas.width = targetW;
-        canvas.height = targetH;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setEditingBanner((prev) => (prev ? { ...prev, image: dataUrl } : prev));
-          return;
-        }
-
-        const srcRatio = img.width / img.height;
-        const targetRatio = targetW / targetH;
-        let sx = 0;
-        let sy = 0;
-        let sw = img.width;
-        let sh = img.height;
-
-        if (srcRatio > targetRatio) {
-          sw = img.height * targetRatio;
-          sx = (img.width - sw) / 2;
-        } else {
-          sh = img.width / targetRatio;
-          sy = (img.height - sh) / 2;
-        }
-
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, targetW, targetH);
-        const cropped16x9 = canvas.toDataURL('image/jpeg', 0.88);
-        setEditingBanner((prev) => (prev ? { ...prev, image: cropped16x9 } : prev));
-      };
-      img.onerror = () => {
-        setEditingBanner((prev) => (prev ? { ...prev, image: dataUrl } : prev));
-      };
-      img.src = dataUrl;
+      setEditingBanner((prev) => (prev ? { ...prev, image: dataUrl } : prev));
     };
     reader.readAsDataURL(file);
   };
 
   const handleSaveBanner = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingBanner?.image || !editingBanner?.titleEn) {
-      showToast('Banner image and headline are required.', 'error');
+    if (!editingBanner?.image) {
+      showToast('Please select or enter a banner image.', 'error');
       return;
     }
     try {
+      const payload = {
+        ...editingBanner,
+        titleEn: (editingBanner.titleEn || '').trim(),
+        titleSw: (editingBanner.titleSw || '').trim(),
+      };
       if (editingBanner.id) {
-        await api.updateBanner(editingBanner.id, editingBanner);
+        await api.updateBanner(editingBanner.id, payload);
         showToast('Banner slide updated!');
       } else {
-        await api.createBanner(editingBanner);
+        await api.createBanner(payload);
         showToast('New banner slide added!');
       }
       setEditingBanner(null);
@@ -2391,24 +2360,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="block font-bold text-slate-800">Banner Image (16:9 Widescreen) *</label>
-                      <span className="text-[10.5px] font-medium text-slate-500">
-                        Auto-formatted to 16:9 (1280×720)
+                      <label className="block font-bold text-slate-800">Banner Image (Full Original Quality) *</label>
+                      <span className="text-[10.5px] font-medium text-emerald-700">
+                        Shown exactly as uploaded (no dark overlay)
                       </span>
                     </div>
                     <input type="file" accept="image/*" onChange={handleBannerImageUpload} />
                     <input
                       type="text"
-                      placeholder="Or enter 16:9 banner image URL / path"
+                      placeholder="Or enter banner image URL / path"
                       value={editingBanner.image || ''}
                       onChange={(e) => setEditingBanner({ ...editingBanner, image: e.target.value })}
                       className="w-full bg-white border p-2 rounded-lg text-xs"
                     />
                     {editingBanner.image && (
-                      <div className="w-full max-w-md aspect-video overflow-hidden border border-slate-200 bg-slate-900">
+                      <div className="w-full max-w-md aspect-video overflow-hidden border border-slate-200 bg-white">
                         <img
                           src={editingBanner.image}
-                          alt="16:9 Banner Preview"
+                          alt="Banner Preview"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -2417,10 +2386,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Headline (English) *</label>
+                      <label className="block font-bold text-slate-700 mb-1">Title / Reference (Optional)</label>
                       <input
                         type="text"
-                        required
+                        placeholder="Optional banner title"
                         value={editingBanner.titleEn || ''}
                         onChange={(e) => setEditingBanner({ ...editingBanner, titleEn: e.target.value })}
                         className="w-full bg-slate-50 border p-2 rounded-lg"

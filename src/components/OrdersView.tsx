@@ -252,14 +252,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
   };
 
   return (
-    <div className="bg-white min-h-[82vh] max-w-2xl mx-auto pb-28">
+    <div className="bg-[#F2F6FC] min-h-[82vh] max-w-2xl mx-auto pb-28">
       {/* Header matching CartView */}
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 sticky top-0 bg-white z-10">
+      <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#DCE7F7] sticky top-0 bg-white z-10">
         <div>
           <h1 className="text-[19px] font-bold text-gray-900 tracking-tight">
             {subTab === 'orders' ? 'My Orders' : 'My Service Bookings'}
           </h1>
-          <p className="text-[11px] text-gray-400">
+          <p className="text-[11px] text-gray-500">
             {subTab === 'orders'
               ? 'Track your private payment & delivery status'
               : 'Track your service appointments & repair status'}
@@ -268,7 +268,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
         <button
           type="button"
           onClick={onRefreshOrders}
-          className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+          className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-[#EAF2FF] rounded-full transition-colors cursor-pointer"
           title="Refresh"
           aria-label="Refresh Orders and Bookings"
         >
@@ -277,14 +277,14 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       </div>
 
       {/* Product Orders | Service Bookings Switch */}
-      <div className="px-4 pt-3">
-        <div className="grid grid-cols-2 bg-[#F5F6F8] p-1 rounded-full gap-1">
+      <div className="px-3 pt-3">
+        <div className="grid grid-cols-2 bg-white border border-[#DCE7F7] p-1 rounded-full gap-1 shadow-2xs">
           <button
             type="button"
             onClick={() => setSubTab('orders')}
             className={`py-2 px-3 rounded-full text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'orders'
-                ? 'bg-[#111827] text-white shadow-2xs'
+                ? 'bg-[#0B3B8C] text-white shadow-2xs'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -305,7 +305,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       </div>
 
       {/* Private Local Filter Bar */}
-      <div className="px-4 pt-3 pb-2">
+      <div className="px-3 pt-2.5 pb-2">
         <div className="relative flex items-center">
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 pointer-events-none" />
           <input
@@ -317,7 +317,7 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                 ? 'Filter your orders by #ID or product name...'
                 : 'Filter your bookings by #BK ref or service...'
             }
-            className="w-full bg-[#F5F6F8] text-[13px] font-medium text-gray-900 pl-10 pr-4 py-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 placeholder-gray-400"
+            className="w-full bg-white border border-[#DCE7F7] text-[13px] font-medium text-gray-900 pl-10 pr-4 py-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-[#0B3B8C] placeholder-gray-400 shadow-2xs"
           />
         </div>
       </div>
@@ -326,26 +326,28 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       {subTab === 'orders' && (
         <>
           {sortedOrders.length === 0 ? (
-            <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-16 h-16 bg-[#F5F6F8] rounded-full flex items-center justify-center mb-3.5">
-                <Package className="w-7 h-7 text-gray-400" />
+            <div className="min-h-[45vh] flex flex-col items-center justify-center p-4 text-center">
+              <div className="bg-white border border-[#DCE7F7] rounded-2xl p-7 max-w-sm w-full shadow-xs flex flex-col items-center">
+                <div className="w-16 h-16 bg-[#EAF2FF] rounded-full flex items-center justify-center mb-3.5">
+                  <Package className="w-7 h-7 text-[#1565C0]" />
+                </div>
+                <h2 className="text-base font-bold text-gray-900 mb-1">No Orders Found</h2>
+                <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
+                  {searchTerm
+                    ? `No orders in your account match "${searchTerm}".`
+                    : 'You have not placed any product orders yet. Browse Obby Tech products to get started.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={onContinueShopping}
+                  className="bg-[#0B3B8C] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-[#082E6E] transition-colors cursor-pointer"
+                >
+                  Start Shopping
+                </button>
               </div>
-              <h2 className="text-base font-bold text-gray-900 mb-1">No Orders Found</h2>
-              <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
-                {searchTerm
-                  ? `No orders in your account match "${searchTerm}".`
-                  : 'You have not placed any product orders yet. Browse Obby Tech products to get started.'}
-              </p>
-              <button
-                type="button"
-                onClick={onContinueShopping}
-                className="bg-[#111827] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-black transition-colors cursor-pointer"
-              >
-                Start Shopping
-              </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 px-4">
+            <div className="space-y-3 px-3 pt-1">
               {sortedOrders.map((order) => {
                 const isPaid = order.paymentStatus === 'PAID';
                 const isShipped =
@@ -359,8 +361,10 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
                   <div
                     key={order.id}
                     id={`order-card-${order.id}`}
-                    className={`py-5 space-y-3.5 scroll-mt-24 transition-colors ${
-                      isHighlighted ? 'bg-[#F9FDF4] -mx-4 px-4 rounded-xl ring-1 ring-[#65C41C]/40' : ''
+                    className={`bg-white border rounded-2xl p-4 space-y-3.5 scroll-mt-24 shadow-2xs transition-colors ${
+                      isHighlighted
+                        ? 'bg-[#F9FDF4] border-[#65C41C]/50 ring-1 ring-[#65C41C]/40'
+                        : 'border-[#DCE7F7]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -552,34 +556,38 @@ export const OrdersView: React.FC<OrdersViewProps> = ({
       {subTab === 'bookings' && (
         <>
           {sortedBookings.length === 0 ? (
-            <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-16 h-16 bg-[#F5F6F8] rounded-full flex items-center justify-center mb-3.5">
-                <Wrench className="w-7 h-7 text-gray-400" />
+            <div className="min-h-[45vh] flex flex-col items-center justify-center p-4 text-center">
+              <div className="bg-white border border-[#DCE7F7] rounded-2xl p-7 max-w-sm w-full shadow-xs flex flex-col items-center">
+                <div className="w-16 h-16 bg-[#EAF2FF] rounded-full flex items-center justify-center mb-3.5">
+                  <Wrench className="w-7 h-7 text-[#1565C0]" />
+                </div>
+                <h2 className="text-base font-bold text-gray-900 mb-1">No Service Bookings Yet</h2>
+                <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
+                  {searchTerm
+                    ? `No bookings in your account match "${searchTerm}".`
+                    : 'Book phone/laptop repairs, graphic design, business ads, or technology consultation anytime.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => (onBrowseServices ? onBrowseServices() : onContinueShopping())}
+                  className="bg-[#0B3B8C] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-[#082E6E] transition-colors cursor-pointer"
+                >
+                  Browse Services
+                </button>
               </div>
-              <h2 className="text-base font-bold text-gray-900 mb-1">No Service Bookings Yet</h2>
-              <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
-                {searchTerm
-                  ? `No bookings in your account match "${searchTerm}".`
-                  : 'Book phone/laptop repairs, graphic design, business ads, or technology consultation anytime.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => (onBrowseServices ? onBrowseServices() : onContinueShopping())}
-                className="bg-[#1565C0] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-[#0d47a1] transition-colors cursor-pointer"
-              >
-                Browse Services
-              </button>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 px-4">
+            <div className="space-y-3 px-3 pt-1">
               {sortedBookings.map((booking) => {
                 const isHighlighted = highlightedBookingId === booking.id;
                 return (
                   <div
                     key={booking.id}
                     id={`booking-card-${booking.id}`}
-                    className={`py-5 space-y-3.5 scroll-mt-24 transition-colors ${
-                      isHighlighted ? 'bg-[#F0F7FF] -mx-4 px-4 rounded-xl ring-1 ring-[#1565C0]/30' : ''
+                    className={`bg-white border rounded-2xl p-4 space-y-3.5 scroll-mt-24 shadow-2xs transition-colors ${
+                      isHighlighted
+                        ? 'bg-[#F0F7FF] border-[#1565C0]/40 ring-1 ring-[#1565C0]/30'
+                        : 'border-[#DCE7F7]'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">

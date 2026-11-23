@@ -21,11 +21,45 @@ export const isOfficialAdminEmail = (email?: string | null): boolean => {
   return email.trim().toLowerCase() === OFFICIAL_ADMIN_EMAIL.toLowerCase();
 };
 
-// Server-verified session token held strictly in JS memory
+const OBBY_SESSION_STORAGE_KEY = 'obby_session_token';
+
+// Active session token in memory + optionally persisted for Remember Me
 let inMemorySessionToken: string | null = null;
 
-export const setAuthToken = (token: string | null) => {
+export const setAuthToken = (token: string | null, rememberMe: boolean = true) => {
   inMemorySessionToken = token;
+  try {
+    if (!token) {
+      localStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
+    } else if (rememberMe) {
+      localStorage.setItem(OBBY_SESSION_STORAGE_KEY, token);
+      sessionStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
+    } else {
+      sessionStorage.setItem(OBBY_SESSION_STORAGE_KEY, token);
+      localStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage errors
+  }
+};
+
+export const restoreSavedAuthToken = (): { token: string | null; remembered: boolean } => {
+  try {
+    const rememberedToken = localStorage.getItem(OBBY_SESSION_STORAGE_KEY);
+    if (rememberedToken) {
+      inMemorySessionToken = rememberedToken;
+      return { token: rememberedToken, remembered: true };
+    }
+    const tabToken = sessionStorage.getItem(OBBY_SESSION_STORAGE_KEY);
+    if (tabToken) {
+      inMemorySessionToken = tabToken;
+      return { token: tabToken, remembered: false };
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return { token: inMemorySessionToken, remembered: false };
 };
 
 export const getAuthToken = (): string | null => inMemorySessionToken;
@@ -33,6 +67,8 @@ export const getAuthToken = (): string | null => inMemorySessionToken;
 export const clearAuthToken = () => {
   inMemorySessionToken = null;
   try {
+    localStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(OBBY_SESSION_STORAGE_KEY);
     localStorage.removeItem('appex_auth_user');
     localStorage.removeItem('appex_session_token');
     localStorage.removeItem('appex_admin_token');
@@ -69,7 +105,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Google authentication failed');
-    if (data.token) setAuthToken(data.token);
+    if (data.token) setAuthToken(data.token, true);
     return data;
   },
 
@@ -81,6 +117,7 @@ export const api = {
     region?: string;
     street?: string;
     address?: string;
+    rememberMe?: boolean;
   }): Promise<AuthResponse> => {
     const res = await fetch('/api/auth/email/register', {
       method: 'POST',
@@ -89,11 +126,15 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Email registration failed');
-    if (data.token) setAuthToken(data.token);
+    if (data.token) setAuthToken(data.token, registerData.rememberMe !== false);
     return data;
   },
 
-  emailLogin: async (loginData: { email: string; password: string }): Promise<AuthResponse> => {
+  emailLogin: async (loginData: {
+    email: string;
+    password: string;
+    rememberMe?: boolean;
+  }): Promise<AuthResponse> => {
     const res = await fetch('/api/auth/email/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -101,7 +142,7 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Email login failed');
-    if (data.token) setAuthToken(data.token);
+    if (data.token) setAuthToken(data.token, loginData.rememberMe !== false);
     return data;
   },
 

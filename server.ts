@@ -29,7 +29,8 @@ import firebaseConfig from './firebase-applet-config.json';
 const PORT = 3000;
 const DB_PATH = path.join(process.cwd(), 'db.json');
 const OFFICIAL_ADMIN_EMAIL = 'obbyitmasters@gmail.com';
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface UserAccount {
   id: string;
@@ -326,15 +327,20 @@ function saveDatabase() {
   }
 }
 
-function createSession(user: UserAccount, adminUnlocked: boolean): SessionRecord {
+function createSession(
+  user: UserAccount,
+  adminUnlocked: boolean,
+  rememberMe: boolean = true
+): SessionRecord {
   const token = crypto.randomBytes(32).toString('hex');
+  const ttl = rememberMe ? REMEMBERED_SESSION_TTL_MS : SESSION_TTL_MS;
   const session: SessionRecord = {
     token,
     userId: user.id,
     email: user.email.toLowerCase(),
     role: isOfficialAdmin(user.email) ? 'admin' : 'customer',
     adminUnlocked: isOfficialAdmin(user.email) && adminUnlocked,
-    expiresAt: Date.now() + SESSION_TTL_MS,
+    expiresAt: Date.now() + ttl,
   };
   db.sessions = db.sessions.filter((s) => s.expiresAt > Date.now());
   db.sessions.push(session);
@@ -1014,7 +1020,7 @@ async function startServer() {
 
   // Customer Email Registration
   app.post('/api/auth/email/register', (req, res) => {
-    const { email, password, fullName, phone, region, street, address } = req.body;
+    const { email, password, fullName, phone, region, street, address, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
@@ -1056,7 +1062,7 @@ async function startServer() {
     };
 
     db.users.push(newUser);
-    const session = createSession(newUser, false);
+    const session = createSession(newUser, false, rememberMe !== false);
     res.status(201).json({
       success: true,
       user: sanitizeUser(newUser),
@@ -1067,7 +1073,7 @@ async function startServer() {
 
   // Email Login (Customer or Admin)
   app.post('/api/auth/email/login', (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
@@ -1090,7 +1096,7 @@ async function startServer() {
     user.mustChangePassword = isAdmin ? db.adminMustChangePassword : false;
     user.updatedAt = new Date().toISOString();
 
-    const session = createSession(user, isAdmin);
+    const session = createSession(user, isAdmin, rememberMe !== false);
     res.json({
       success: true,
       user: sanitizeUser(user),

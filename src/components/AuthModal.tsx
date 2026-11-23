@@ -1,32 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Mail, Lock, User, AlertCircle, X, Shield, Eye, EyeOff, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Lock, User, AlertCircle, X, Shield, Eye, EyeOff, Loader2, Check } from 'lucide-react';
 import { api } from '../services/api';
 import { CustomerProfile } from '../types';
-import { auth, googleProvider, signInWithPopup, signInWithRedirect } from '../lib/firebase';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { ObbyTechLogoEmblem, ObbyTechWordmark } from './ObbyTechBrand';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose?: () => void;
-  onSuccess: (user: CustomerProfile, token: string) => void;
+  onSuccess: (user: CustomerProfile, token: string, rememberMe?: boolean) => void;
   title?: string;
   subtitle?: string;
   isModal?: boolean;
   websiteLogo?: string;
 }
 
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
-
 export const AuthModal: React.FC<AuthModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  title = 'OBBY TECH',
   subtitle = 'Sign in or create an account to continue',
   isModal = true,
   websiteLogo,
@@ -38,191 +29,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
-  const [needsOAuthRetry, setNeedsOAuthRetry] = useState(false);
-
-  const tokenClientRef = useRef<any>(null);
-
-  useEffect(() => {
-    const initGoogleServices = () => {
-      if (!window.google?.accounts?.oauth2 || tokenClientRef.current) return;
-
-      const clientId =
-        firebaseConfig.oAuthClientId ||
-        '546440312673-d3nm3b57e644uh9jdclfpd59k9phuna3.apps.googleusercontent.com';
-
-      try {
-        tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'email profile openid',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse?.error) {
-              setIsLoading(false);
-              if (tokenResponse.error === 'popup_closed_by_user') {
-                setErrorMsg('Google sign-in was cancelled.');
-              } else {
-                setErrorMsg('Unable to complete Google OAuth sign-in. Please try again.');
-              }
-              return;
-            }
-            if (!tokenResponse?.access_token) {
-              setIsLoading(false);
-              setErrorMsg('No Google access token received.');
-              return;
-            }
-            try {
-              const authRes = await api.googleAuth({
-                accessToken: tokenResponse.access_token,
-              });
-              onSuccess(authRes.user, authRes.token);
-            } catch (e: any) {
-              setErrorMsg(e.message || 'Unable to verify Google account.');
-            } finally {
-              setIsLoading(false);
-            }
-          },
-          error_callback: () => {
-            setIsLoading(false);
-            setErrorMsg('Google popup was closed or blocked by your browser.');
-          },
-        });
-      } catch (e) {
-        console.warn('Google Identity Services setup note:', e);
-      }
-    };
-
-    const existingScript = document.getElementById('google-gsi-script') as HTMLScriptElement | null;
-    if (existingScript) {
-      if (window.google?.accounts) {
-        initGoogleServices();
-      } else {
-        existingScript.addEventListener('load', initGoogleServices);
-        return () => existingScript.removeEventListener('load', initGoogleServices);
-      }
-    } else {
-      const script = document.createElement('script');
-      script.id = 'google-gsi-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = initGoogleServices;
-      document.head.appendChild(script);
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  // Synchronous Google OAuth trigger (preserves user-click activation so browsers never block popup)
-  const handleDirectGoogleOAuth = () => {
-    setErrorMsg('');
-    setInfoMsg('');
-    if (tokenClientRef.current) {
-      setIsLoading(true);
-      tokenClientRef.current.requestAccessToken({ prompt: 'select_account' });
-      return;
-    }
-
-    if (window.google?.accounts?.oauth2) {
-      const clientId =
-        firebaseConfig.oAuthClientId ||
-        '546440312673-d3nm3b57e644uh9jdclfpd59k9phuna3.apps.googleusercontent.com';
-      const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: 'email profile openid',
-        callback: async (tokenResponse: any) => {
-          if (tokenResponse?.error || !tokenResponse?.access_token) {
-            setIsLoading(false);
-            setErrorMsg('Google sign-in was cancelled or failed.');
-            return;
-          }
-          try {
-            const authRes = await api.googleAuth({ accessToken: tokenResponse.access_token });
-            onSuccess(authRes.user, authRes.token);
-          } catch (e: any) {
-            setErrorMsg(e.message || 'Unable to verify Google account.');
-          } finally {
-            setIsLoading(false);
-          }
-        },
-        error_callback: () => {
-          setIsLoading(false);
-          setErrorMsg('Google sign-in popup was closed or blocked.');
-        },
-      });
-      tokenClientRef.current = client;
-      setIsLoading(true);
-      client.requestAccessToken({ prompt: 'select_account' });
-    } else {
-      setErrorMsg('Google Sign-In service is still loading. Please allow popups and try again.');
-    }
-  };
-
-  // Real Google Authentication Flow
-  const handleGoogleAuth = async () => {
-    setIsLoading(true);
-    setErrorMsg('');
-    setInfoMsg('');
-    setNeedsOAuthRetry(false);
-
-    try {
-      // 1. Primary: Firebase Google Auth Popup
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-
-      if (!user || !user.email) {
-        throw new Error('No email address provided by Google account.');
-      }
-
-      const idToken = await user.getIdToken();
-      const authRes = await api.googleAuth({ idToken });
-
-      onSuccess(authRes.user, authRes.token);
-    } catch (err: any) {
-      console.warn('Firebase signInWithPopup failed:', err?.code || err?.message || err);
-
-      if (
-        err.code === 'auth/popup-closed-by-user' ||
-        err.code === 'auth/cancelled-popup-request' ||
-        err.code === 'auth/user-cancelled'
-      ) {
-        setIsLoading(false);
-        setErrorMsg('Google sign-in was cancelled.');
-        return;
-      }
-
-      // Inside an iframe (such as AI Studio preview), NEVER call signInWithRedirect (Google blocks iframes).
-      // Instead, offer a clean synchronous OAuth popup button so the browser keeps user activation!
-      const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
-      if (!isInIframe && err.code === 'auth/popup-blocked') {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch {
-          // fall through to OAuth retry button
-        }
-      }
-
-      setIsLoading(false);
-      setNeedsOAuthRetry(true);
-      if (err.code === 'auth/unauthorized-domain') {
-        setInfoMsg(
-          'Click "Sign in with Google Account (OAuth)" below to choose your Google email.'
-        );
-      } else {
-        setInfoMsg(
-          'Popup was interrupted. Click "Sign in with Google Account (OAuth)" below or sign in with Email & Password.'
-        );
-      }
-    }
+  // Continue with Google — purely decorative placeholder (no action on click)
+  const handleDecorativeGoogleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
   };
 
   // Facebook Auth Click Handler
   const handleFacebookAuth = () => {
     setErrorMsg('');
-    setInfoMsg('Facebook Authentication is currently unavailable. Please sign in using Google or Email.');
+    setInfoMsg('Facebook Authentication is currently unavailable. Please sign in using Email & Password below.');
   };
 
   // Email Submit Handler
@@ -255,11 +78,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           email,
           password,
           fullName: fullName || email.split('@')[0],
+          rememberMe,
         });
-        onSuccess(res.user, res.token);
+        onSuccess(res.user, res.token, rememberMe);
       } else {
-        const res = await api.emailLogin({ email, password });
-        onSuccess(res.user, res.token);
+        const res = await api.emailLogin({ email, password, rememberMe });
+        onSuccess(res.user, res.token, rememberMe);
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication failed. Please check your details and try again.');
@@ -304,42 +128,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       {/* Auth Provider Buttons */}
       <div className="space-y-2.5">
-        {/* Google Sign In */}
+        {/* Google Sign In — Decorative Only (no action on click) */}
         <button
           type="button"
-          onClick={needsOAuthRetry ? handleDirectGoogleOAuth : handleGoogleAuth}
-          disabled={isLoading}
-          className="w-full bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-3 transition-all shadow-2xs active:scale-98 disabled:opacity-50 cursor-pointer"
+          onClick={handleDecorativeGoogleClick}
+          className="w-full bg-white border border-slate-300 text-slate-800 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-3 shadow-2xs cursor-default"
         >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
-          ) : (
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-          )}
-          <span>
-            {isLoading
-              ? 'Signing in with Google...'
-              : needsOAuthRetry
-              ? 'Sign in with Google Account (OAuth)'
-              : 'Continue with Google'}
-          </span>
+          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+            />
+          </svg>
+          <span>Continue with Google</span>
         </button>
 
         {/* Facebook Sign In */}
@@ -356,13 +169,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </button>
       </div>
 
-      {/* Divider */}
-      <div className="relative flex items-center justify-center my-2">
-        <div className="border-t border-slate-200 w-full" />
-        <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-          Or with Email
-        </span>
-      </div>
+      {/* Subtle Clean Divider */}
+      <div className="border-t border-slate-200/80 my-1" />
 
       {/* Mode Switch Tabs */}
       <div className="grid grid-cols-2 bg-slate-100 p-1 rounded-xl gap-1 text-xs font-bold">
@@ -484,10 +292,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
+        {/* Remember Me Tick Checkbox — Neatly Aligned for Both Create Account & Sign In */}
+        <div className="pt-1">
+          <label className="flex items-center gap-2.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-200/90 rounded-xl px-3 py-2.5 cursor-pointer select-none transition-colors">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                rememberMe
+                  ? 'bg-[#1565C0] border-[#1565C0] text-white shadow-2xs'
+                  : 'bg-white border-slate-300 text-transparent'
+              }`}
+            >
+              <Check className="w-3 h-3 stroke-[3]" />
+            </span>
+            <div className="flex-1 min-w-0 leading-tight">
+              <span className="block text-[11.5px] font-bold text-slate-800">
+                Remember me
+              </span>
+              <span className="block text-[10px] text-slate-500">
+                Keep my account signed in automatically on this device
+              </span>
+            </div>
+          </label>
+        </div>
+
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 mt-2 disabled:opacity-50 cursor-pointer"
+          className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 mt-1 disabled:opacity-50 cursor-pointer"
         >
           {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
           <span>
@@ -501,6 +339,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </span>
         </button>
       </form>
+
+      {/* Bottom Helpful Guidance Message */}
+      <div className="pt-2 border-t border-slate-100 text-center">
+        <p className="text-[11.5px] text-slate-600 leading-relaxed">
+          Already have an account?{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setMode('signin');
+              setErrorMsg('');
+            }}
+            className="font-bold text-[#1565C0] hover:underline cursor-pointer"
+          >
+            Sign in
+          </button>{' '}
+          to continue. If this is your first time here, please{' '}
+          <button
+            type="button"
+            onClick={() => {
+              setMode('register');
+              setErrorMsg('');
+            }}
+            className="font-bold text-[#1565C0] hover:underline cursor-pointer"
+          >
+            create an account
+          </button>{' '}
+          to get started.
+        </p>
+      </div>
     </div>
   );
 

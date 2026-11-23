@@ -62,30 +62,32 @@ export const CartView: React.FC<CartViewProps> = ({
 
   if (cartItems.length === 0) {
     return (
-      <div className="bg-white min-h-[65vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-[#F5F6F8] rounded-full flex items-center justify-center mb-3.5">
-          <ShoppingBag className="w-7 h-7 text-gray-400" />
+      <div className="bg-[#F2F6FC] min-h-[75vh] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white border border-[#DCE7F7] rounded-2xl p-7 max-w-sm w-full shadow-xs flex flex-col items-center">
+          <div className="w-16 h-16 bg-[#EAF2FF] rounded-full flex items-center justify-center mb-3.5">
+            <ShoppingBag className="w-7 h-7 text-[#1565C0]" />
+          </div>
+          <h2 className="text-base font-bold text-gray-900 mb-1">Your Shopping Cart is Empty</h2>
+          <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
+            Explore our collection of Phones, Laptops, CCTV, and Accessories from Obby Tech.
+          </p>
+          <button
+            type="button"
+            onClick={onContinueShopping}
+            className="bg-[#0B3B8C] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-[#082E6E] transition-colors cursor-pointer"
+          >
+            Continue Shopping
+          </button>
         </div>
-        <h2 className="text-base font-bold text-gray-900 mb-1">Your Shopping Cart is Empty</h2>
-        <p className="text-xs text-gray-500 mb-5 max-w-xs leading-relaxed">
-          Explore our collection of Phones, Laptops, CCTV, and Accessories from Obby Tech.
-        </p>
-        <button
-          type="button"
-          onClick={onContinueShopping}
-          className="bg-[#111827] text-white font-semibold text-sm px-7 py-3 rounded-full hover:bg-black transition-colors cursor-pointer"
-        >
-          Continue Shopping
-        </button>
       </div>
     );
   }
 
   return (
-    <div className="bg-white min-h-[82vh] max-w-2xl mx-auto flex flex-col justify-between pb-36">
+    <div className="bg-[#F2F6FC] min-h-[82vh] max-w-2xl mx-auto flex flex-col justify-between pb-40">
       <div>
         {/* Header matching reference screenshot */}
-        <div className="flex items-center justify-between px-4 py-3.5 border-b border-gray-100 sticky top-0 bg-white z-10">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-[#DCE7F7] sticky top-0 bg-white z-10">
           <h1 className="text-[19px] font-bold text-gray-900 tracking-tight">Shopping Cart</h1>
           <button
             type="button"
@@ -98,7 +100,7 @@ export const CartView: React.FC<CartViewProps> = ({
         </div>
 
         {/* Cart Items List */}
-        <div className="divide-y divide-gray-100 px-4">
+        <div className="bg-white mx-3 mt-3 rounded-2xl border border-[#DCE7F7] divide-y divide-gray-100 px-3.5 shadow-2xs">
           {cartItems.map((item) => {
             const isSelected = selectedIds.includes(item.productId);
             return (
@@ -186,8 +188,8 @@ export const CartView: React.FC<CartViewProps> = ({
         </div>
 
         {/* Clean Delivery Policy Note */}
-        <div className="mx-4 mt-2 bg-[#F5F6F8] rounded-xl p-3.5 flex items-start gap-2.5">
-          <Truck className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+        <div className="mx-3 mt-3 bg-white border border-[#DCE7F7] rounded-2xl p-3.5 flex items-start gap-2.5 shadow-2xs">
+          <Truck className="w-4 h-4 text-[#1565C0] flex-shrink-0 mt-0.5" />
           <div className="text-[11px] text-gray-600 leading-relaxed">
             <span className="font-semibold text-gray-900">Obby Tech Delivery:</span> Dodoma
             express delivery available. Customers outside Dodoma pay TSh{' '}
@@ -197,7 +199,7 @@ export const CartView: React.FC<CartViewProps> = ({
       </div>
 
       {/* Bottom Summary & Dual Pill Action Bar (Fixed above BottomNav) */}
-      <div className="fixed bottom-16 left-0 right-0 z-30 bg-white border-t border-gray-100 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
+      <div className="fixed bottom-16 left-0 right-0 z-30 bg-white border-t border-[#DCE7F7] shadow-[0_-4px_16px_rgba(11,59,140,0.06)]">
         <div className="max-w-2xl mx-auto px-4 pt-3 pb-3.5 space-y-3">
           {/* ALL Toggle & Subtotal */}
           <div className="flex items-center justify-between">

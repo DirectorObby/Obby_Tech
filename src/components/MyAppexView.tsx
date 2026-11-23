@@ -454,7 +454,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
 
   if (!isAuthenticated) {
     return (
-      <div className="bg-slate-50 min-h-[85vh] pb-24 p-3 max-w-md mx-auto space-y-4 animate-fade-in">
+      <div className="bg-[#F2F6FC] min-h-[85vh] pb-24 p-3 max-w-md mx-auto space-y-4 animate-fade-in">
         <AuthModal
           isOpen={true}
           isModal={false}
@@ -472,7 +472,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
   const whatsappLink = `https://wa.me/${formatWhatsAppTarget(contactWhatsapp)}`;
 
   return (
-    <div className="bg-white min-h-[85vh] pb-24 p-3 max-w-2xl mx-auto space-y-4 animate-fade-in">
+    <div className="bg-[#F2F6FC] min-h-[85vh] pb-24 p-3 max-w-2xl mx-auto space-y-4 animate-fade-in">
       {/* Account Profile Banner Header (Midnight Navy matching Obby Tech logo) */}
       <div className="bg-[#0C0826] text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -524,7 +524,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
           className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeSection === 'info'
               ? 'bg-[#0C0826] text-white border-[#0C0826] shadow-xs'
-              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              : 'bg-white text-slate-700 border-[#DCE7F7] hover:bg-[#EAF2FF]/60'
           }`}
         >
           <User className="w-4 h-4" />
@@ -537,7 +537,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
           className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeSection === 'about'
               ? 'bg-[#0C0826] text-white border-[#0C0826] shadow-xs'
-              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              : 'bg-white text-slate-700 border-[#DCE7F7] hover:bg-[#EAF2FF]/60'
           }`}
         >
           <Info className="w-4 h-4" />
@@ -550,7 +550,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
           className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeSection === 'contact'
               ? 'bg-[#0C0826] text-white border-[#0C0826] shadow-xs'
-              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              : 'bg-white text-slate-700 border-[#DCE7F7] hover:bg-[#EAF2FF]/60'
           }`}
         >
           <PhoneCall className="w-4 h-4" />
@@ -563,7 +563,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
           className={`p-3 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
             activeSection === 'delivery'
               ? 'bg-[#0C0826] text-white border-[#0C0826] shadow-xs'
-              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              : 'bg-white text-slate-700 border-[#DCE7F7] hover:bg-[#EAF2FF]/60'
           }`}
         >
           <Truck className="w-4 h-4" />
@@ -572,7 +572,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
       </div>
 
       {/* Dynamic Content Card */}
-      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
+      <div className="bg-white p-4 rounded-2xl border border-[#DCE7F7] space-y-4 shadow-2xs">
         {/* 1. My Information */}
         {activeSection === 'info' && (
           <form onSubmit={handleUpdatePersonalInfo} className="space-y-3">

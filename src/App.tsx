@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot } from 'lucide-react';
 import { Header } from './components/Header';
 import { RecommendedCategories } from './components/RecommendedCategories';
 import { ProductCard } from './components/ProductCard';
@@ -23,6 +22,7 @@ import {
   clearAuthToken,
   getAuthToken,
   isOfficialAdminEmail,
+  restoreSavedAuthToken,
   setAuthToken,
 } from './services/api';
 import {
@@ -130,6 +130,129 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Phone / Browser Hardware Back Button Support — step back through modals & inner pages before exiting
+  const navDepth =
+    (activeTab !== 'home' ? 1 : 0) +
+    (activeTab === 'home' && selectedCategory !== 'All' ? 1 : 0) +
+    (activeTab === 'home' && selectedCategory === 'Services' && selectedServiceId ? 1 : 0) +
+    (activeTab === 'home' && activeSearchQuery ? 1 : 0) +
+    (activeProductDetails ? 1 : 0) +
+    (checkoutItems ? 1 : 0) +
+    (latestSubmittedOrder ? 1 : 0) +
+    (activeBookingService ? 1 : 0) +
+    (authModalState.isOpen ? 1 : 0) +
+    (isNotificationsOpen ? 1 : 0) +
+    (isAdminDashboardOpen ? 1 : 0) +
+    (isChatFullMode ? 1 : 0);
+
+  const lastNavDepthRef = useRef(0);
+  const isPoppingHistoryRef = useRef(false);
+  const navSnapshotRef = useRef({
+    activeTab,
+    selectedCategory,
+    selectedServiceId,
+    activeSearchQuery,
+    activeProductDetails,
+    checkoutItems,
+    latestSubmittedOrder,
+    activeBookingService,
+    authModalOpen: authModalState.isOpen,
+    isNotificationsOpen,
+    isAdminDashboardOpen,
+    isChatFullMode,
+  });
+
+  navSnapshotRef.current = {
+    activeTab,
+    selectedCategory,
+    selectedServiceId,
+    activeSearchQuery,
+    activeProductDetails,
+    checkoutItems,
+    latestSubmittedOrder,
+    activeBookingService,
+    authModalOpen: authModalState.isOpen,
+    isNotificationsOpen,
+    isAdminDashboardOpen,
+    isChatFullMode,
+  };
+
+  useEffect(() => {
+    if (isPoppingHistoryRef.current) {
+      isPoppingHistoryRef.current = false;
+      lastNavDepthRef.current = navDepth;
+      return;
+    }
+
+    if (navDepth > lastNavDepthRef.current) {
+      window.history.pushState({ obbyNavDepth: navDepth }, '');
+    }
+    lastNavDepthRef.current = navDepth;
+  }, [navDepth]);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const s = navSnapshotRef.current;
+      const currentDepth =
+        (s.activeTab !== 'home' ? 1 : 0) +
+        (s.activeTab === 'home' && s.selectedCategory !== 'All' ? 1 : 0) +
+        (s.activeTab === 'home' && s.selectedCategory === 'Services' && s.selectedServiceId ? 1 : 0) +
+        (s.activeTab === 'home' && s.activeSearchQuery ? 1 : 0) +
+        (s.activeProductDetails ? 1 : 0) +
+        (s.checkoutItems ? 1 : 0) +
+        (s.latestSubmittedOrder ? 1 : 0) +
+        (s.activeBookingService ? 1 : 0) +
+        (s.authModalOpen ? 1 : 0) +
+        (s.isNotificationsOpen ? 1 : 0) +
+        (s.isAdminDashboardOpen ? 1 : 0) +
+        (s.isChatFullMode ? 1 : 0);
+
+      if (currentDepth <= 0) return;
+
+      isPoppingHistoryRef.current = true;
+
+      if (s.isAdminDashboardOpen) {
+        setIsAdminDashboardOpen(false);
+      } else if (s.isNotificationsOpen) {
+        setIsNotificationsOpen(false);
+      } else if (s.authModalOpen) {
+        setPendingTab(null);
+        setPendingBuyProduct(null);
+        setPendingBookingService(null);
+        setPendingBookingShowcaseItem(null);
+        setAuthModalState({ isOpen: false });
+      } else if (s.latestSubmittedOrder) {
+        setLatestSubmittedOrder(null);
+      } else if (s.checkoutItems) {
+        setCheckoutItems(null);
+      } else if (s.activeBookingService) {
+        setActiveBookingService(null);
+        setActiveBookingShowcaseItem(null);
+      } else if (s.activeProductDetails) {
+        setActiveProductDetails(null);
+      } else if (s.isChatFullMode) {
+        setIsChatFullMode(false);
+      } else if (s.activeTab === 'home' && s.selectedCategory === 'Services' && s.selectedServiceId) {
+        setSelectedServiceId(null);
+      } else if (s.activeTab === 'home' && s.activeSearchQuery) {
+        setSearchInput('');
+        setActiveSearchQuery('');
+      } else if (s.activeTab === 'home' && s.selectedCategory !== 'All') {
+        setSelectedCategory('All');
+      } else if (s.activeTab !== 'home') {
+        setActiveTab('home');
+      }
+
+      const remainingDepth = Math.max(0, currentDepth - 1);
+      if (remainingDepth > 0 && !event.state?.obbyNavDepth) {
+        window.history.pushState({ obbyNavDepth: remainingDepth }, '');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const customerProfile: CustomerProfile = authUser || {
     id: '',
     fullName: '',
@@ -141,11 +264,23 @@ export default function App() {
     authProvider: 'email',
   };
 
-  // Clear any legacy localStorage token remnants & verify Firebase Google Auth redirect / session
+  // Restore Remembered Session & Verify Active Login on Startup
   useEffect(() => {
-    clearAuthToken();
+    const restoreSession = async () => {
+      const { token } = restoreSavedAuthToken();
+      if (token) {
+        try {
+          const me = await api.getCurrentUser();
+          if (me && me.user) {
+            setAuthUser(me.user);
+            setAdminUnlocked(Boolean(me.adminUnlocked));
+            return;
+          }
+        } catch {
+          clearAuthToken();
+        }
+      }
 
-    const checkRedirect = async () => {
       try {
         const redirectRes = await getRedirectResult(auth);
         if (redirectRes && redirectRes.user && redirectRes.user.email) {
@@ -159,7 +294,8 @@ export default function App() {
         console.warn('Google redirect result check failed:', e);
       }
     };
-    checkRedirect();
+
+    restoreSession();
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser && fbUser.email && !getAuthToken()) {
@@ -248,8 +384,8 @@ export default function App() {
   };
 
   // Auth Success Handler
-  const handleAuthSuccess = (user: CustomerProfile, token: string) => {
-    setAuthToken(token);
+  const handleAuthSuccess = (user: CustomerProfile, token: string, rememberMe: boolean = true) => {
+    setAuthToken(token, rememberMe);
     setAuthUser(user);
     const isAdmin = user.role === 'admin' || isOfficialAdminEmail(user.email);
     setAdminUnlocked(isAdmin && user.authProvider === 'email');
@@ -487,7 +623,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans antialiased selection:bg-[#00B553] selection:text-white">
+    <div className="min-h-screen bg-[#F2F6FC] text-gray-900 font-sans antialiased selection:bg-[#00B553] selection:text-white">
       {/* Top Header - Hidden in Full Chat Mode */}
       {!showFullChat && (
         <Header
@@ -532,9 +668,9 @@ export default function App() {
       )}
 
       {/* Dynamic Tab Render Area */}
-      <main className={showFullChat ? 'w-full bg-white' : 'max-w-4xl mx-auto bg-white'}>
+      <main className={showFullChat ? 'w-full bg-white' : 'max-w-4xl mx-auto bg-[#F2F6FC]'}>
         {activeTab === 'home' && (
-          <div className="bg-white min-h-[85vh] pb-20">
+          <div className="bg-[#F2F6FC] min-h-[85vh] pb-20">
             {/* Promotional Slides Banner at Top of Home Page */}
             {!activeSearchQuery && (
               <PromoBannerCarousel
@@ -563,7 +699,7 @@ export default function App() {
             )}
 
             {/* Home Content Area */}
-            <div id="home-products-section" className="p-3 bg-white space-y-5">
+            <div id="home-products-section" className="p-3 bg-[#F2F6FC] space-y-5">
               {selectedCategory === 'Services' && !activeSearchQuery ? (
                 <ServicesSection
                   services={services}
@@ -780,7 +916,7 @@ export default function App() {
         />
       )}
 
-      {/* Floating Round Dark Blue Animated "Obby Ai" Chatbot Button (Bottom-Right) */}
+      {/* Floating Round Animated WhatsApp Button (+255 713 340 900) at Bottom-Right */}
       {activeTab !== 'messenger' &&
         !isSearchFocused &&
         !activeProductDetails &&
@@ -789,30 +925,34 @@ export default function App() {
         !activeBookingService &&
         !isAdminDashboardOpen &&
         !isNotificationsOpen &&
-        !authModalState.isOpen && (
-          <div
-            className={`fixed right-3.5 z-35 transition-all duration-150 ease-out ${
-              isBottomNavVisible ? 'bottom-[70px]' : 'bottom-4'
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => handleTabChange('messenger')}
-              aria-label="Open Obby Ai Chatbot"
-              title="Obby Ai"
-              className="relative group animate-obby-float w-[54px] h-[54px] rounded-full flex flex-col items-center justify-center bg-[#0B3B8C] hover:bg-[#082E6E] text-white shadow-[0_6px_20px_rgba(11,59,140,0.48)] border border-white/25 transition-colors active:scale-95 cursor-pointer"
+        !authModalState.isOpen && (() => {
+          const rawWa = (settings.contactSettings?.whatsapp || '+255713340900').replace(/[^\d]/g, '');
+          const waDigits = rawWa.startsWith('0') && rawWa.length >= 10 ? `255${rawWa.slice(1)}` : rawWa || '255713340900';
+          return (
+            <div
+              className={`fixed right-3.5 z-35 transition-all duration-150 ease-out ${
+                isBottomNavVisible ? 'bottom-[72px]' : 'bottom-4'
+              }`}
             >
-              <span
-                aria-hidden="true"
-                className="absolute inset-0 rounded-full bg-[#1565C0] opacity-35 animate-ping pointer-events-none"
-              />
-              <Bot className="w-5 h-5 relative z-10 shrink-0" />
-              <span className="relative z-10 text-[9px] font-bold leading-none mt-0.5 tracking-tight whitespace-nowrap">
-                Obby Ai
-              </span>
-            </button>
-          </div>
-        )}
+              <a
+                href={`https://wa.me/${waDigits}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp +255 713 340 900"
+                title="Chat on WhatsApp (+255 713 340 900)"
+                className="relative group animate-obby-float w-[54px] h-[54px] rounded-full flex items-center justify-center bg-[#25D366] hover:bg-[#1fb857] text-white shadow-[0_6px_20px_rgba(37,211,102,0.45)] border-2 border-white transition-colors active:scale-95"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-full bg-[#25D366] opacity-35 animate-ping pointer-events-none"
+                />
+                <svg className="w-7 h-7 fill-current relative z-10" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.766.469 3.484 1.344 5l-1.406 5.156 5.281-1.375c1.469.797 3.109 1.219 4.75 1.219 5.516 0 9.969-4.453 9.969-9.969S17.547 2 12.031 2zm5.813 14.125c-.25.703-1.438 1.344-2 1.438-.516.078-1.188.109-1.906-.125-.438-.141-1-.328-1.719-.641-3.031-1.313-5-4.375-5.156-4.578-.156-.203-1.234-1.641-1.234-3.125s.781-2.219 1.063-2.516c.281-.297.609-.375.813-.375s.406 0 .578.016c.188.016.438-.078.688.531.25.609.859 2.094.938 2.25.078.156.125.344.016.547-.109.203-.156.328-.313.516-.156.188-.328.422-.469.563-.156.156-.313.328-.141.625.172.297.781 1.281 1.672 2.078 1.156 1.031 2.125 1.344 2.422 1.5.297.156.469.125.641-.078.172-.203.75-.875.953-1.172.203-.297.406-.25.672-.156.266.094 1.719.813 2.016.953.297.156.5.219.578.344.078.125.078.734-.172 1.438z" />
+                </svg>
+              </a>
+            </div>
+          );
+        })()}
 
       {/* OVERLAY MODALS */}
 

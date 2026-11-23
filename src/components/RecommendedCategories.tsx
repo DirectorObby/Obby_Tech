@@ -62,7 +62,7 @@ export const RecommendedCategories: React.FC<RecommendedCategoriesProps> = ({
   language,
 }) => {
   return (
-    <div className="bg-white py-4 px-3 border-b border-slate-100">
+    <div className="bg-white py-4 px-3 border-y border-[#DCE7F7]">
       <div className="max-w-4xl mx-auto">
         <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
           {language === 'en' ? 'Recommended for you' : 'Inayopendekezwa kwako'}
