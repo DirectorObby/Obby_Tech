@@ -29,17 +29,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0 pointer-events-none'
       }`}
     >
-      <div className="max-w-md mx-auto grid grid-cols-4 h-15 px-1.5 py-1 gap-1">
+      <div className="max-w-md mx-auto grid grid-cols-4 h-14">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold rounded-xl transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-white text-[#0B3B8C] font-extrabold shadow-xs ring-1 ring-[#1565C0]/20'
-                  : 'text-[#314E73] hover:bg-white/60 hover:text-[#0C0826]'
+              className={`relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
+                isActive ? 'text-[#0B3B8C] font-extrabold' : 'text-[#314E73] hover:text-[#0C0826]'
               }`}
             >
               <div className="relative">
