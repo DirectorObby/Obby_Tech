@@ -47,6 +47,7 @@ import { api, isOfficialAdminEmail } from '../services/api';
 import { renderCategoryLucideIcon } from './RecommendedCategories';
 import { renderServiceIcon } from './ServicesSection';
 import { ObbyTechLogoEmblem, ObbyTechWordmark } from './ObbyTechBrand';
+import { readImageFileAsDataUrl } from '../utils/imageUpload';
 
 type AdminTab =
   | 'home'
@@ -271,16 +272,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }));
   };
 
-  const handleServicesBannerImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleServicesBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        updateServicesBannerField('imageUrl', evt.target.result as string);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file);
+      updateServicesBannerField('imageUrl', dataUrl);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load selected image.', 'error');
+    }
   };
 
   const handleSaveServicesBanner = async (e: React.FormEvent) => {
@@ -359,18 +360,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Product helpers
-  const handleMultipleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setProductImages((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+  const handleMultipleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList) as File[];
+    e.target.value = '';
+    for (const file of files) {
+      try {
+        const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1600 });
+        setProductImages((prev) => [...prev, dataUrl]);
+      } catch (err: any) {
+        showToast(err?.message || `Could not load ${file.name}.`, 'error');
+      }
+    }
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
@@ -532,20 +534,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  const handleShowcaseImageUpload = (
+  const handleShowcaseImageUpload = async (
     itemId: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const dataUrl = evt.target?.result as string;
-      if (dataUrl) {
-        handleUpdateShowcaseItem(itemId, { image: dataUrl });
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1600 });
+      handleUpdateShowcaseItem(itemId, { image: dataUrl });
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load selected image.', 'error');
+    }
   };
 
   const handleSaveService = async (e: React.FormEvent) => {
@@ -584,16 +585,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Banner helpers — preserve exact original uploaded banner photo in full crisp quality
-  const handleBannerImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file || !editingBanner) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const dataUrl = evt.target?.result as string;
-      if (!dataUrl) return;
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 2048, maxRawBytes: 4_000_000, quality: 0.94 });
       setEditingBanner((prev) => (prev ? { ...prev, image: dataUrl } : prev));
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load selected banner image.', 'error');
+    }
   };
 
   const handleSaveBanner = async (e: React.FormEvent) => {
@@ -655,35 +656,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // Category helpers
-  const handleCategoryIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file || !editingCategory) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setEditingCategory({
-          ...editingCategory,
-          icon: evt.target.result as string,
-          iconType: 'image',
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 600, maxRawBytes: 1_000_000 });
+      setEditingCategory((prev) =>
+        prev
+          ? {
+              ...prev,
+              icon: dataUrl,
+              iconType: 'image',
+            }
+          : prev
+      );
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load icon image.', 'error');
+    }
   };
 
-  const handleCategoryThumbUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCategoryThumbUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file || !editingCategory) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      if (evt.target?.result) {
-        setEditingCategory({
-          ...editingCategory,
-          imageUrl: evt.target.result as string,
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1200 });
+      setEditingCategory((prev) => (prev ? { ...prev, imageUrl: dataUrl } : prev));
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load category image.', 'error');
+    }
   };
 
   const handleSaveCategory = async (e: React.FormEvent) => {
@@ -774,16 +776,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          setNewLogo(evt.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1024, maxRawBytes: 1_500_000 });
+      setNewLogo(dataUrl);
+    } catch (err: any) {
+      showToast(err?.message || 'Unable to load logo image.', 'error');
     }
   };
 
@@ -1433,9 +1434,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <input
                           type="file"
                           multiple
-                          accept="image/*"
                           onChange={handleMultipleImageUpload}
-                          className="text-xs text-gray-500"
+                          className="text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:text-xs file:font-bold file:text-slate-800 hover:file:bg-slate-100 cursor-pointer"
                         />
                       </div>
                       <div className="flex items-center gap-2 pt-1">
@@ -1970,9 +1970,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </label>
                     <input
                       type="file"
-                      accept="image/*"
                       onChange={handleServicesBannerImageUpload}
-                      className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[11px]"
+                      className="w-full bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[11px] file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border file:border-slate-300 file:bg-white file:text-[11px] file:font-bold file:text-slate-800 cursor-pointer"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -2140,9 +2139,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 )}
                                 <input
                                   type="file"
-                                  accept="image/*"
                                   onChange={(e) => handleShowcaseImageUpload(item.id, e)}
-                                  className="w-full text-[10.5px]"
+                                  className="w-full text-[10.5px] file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border file:border-slate-300 file:bg-white file:text-[10.5px] file:font-bold file:text-slate-800 cursor-pointer"
                                 />
                                 <input
                                   type="text"
@@ -2365,7 +2363,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         Shown exactly as uploaded (no dark overlay)
                       </span>
                     </div>
-                    <input type="file" accept="image/*" onChange={handleBannerImageUpload} />
+                    <input
+                      type="file"
+                      onChange={handleBannerImageUpload}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:text-xs file:font-bold file:text-slate-800 cursor-pointer"
+                    />
                     <input
                       type="text"
                       placeholder="Or enter banner image URL / path"
@@ -2659,7 +2661,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {editingCategory.iconType === 'image' && (
                     <div className="space-y-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <label className="block font-bold text-slate-700">Upload Custom Icon Image</label>
-                      <input type="file" accept="image/*" onChange={handleCategoryIconUpload} />
+                      <input
+                        type="file"
+                        onChange={handleCategoryIconUpload}
+                        className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:text-xs file:font-bold file:text-slate-800 cursor-pointer"
+                      />
                       {editingCategory.icon && editingCategory.icon.startsWith('data:image') && (
                         <img
                           src={editingCategory.icon}
@@ -2672,7 +2678,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                   <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <label className="block font-bold text-slate-700">Category Background Thumbnail</label>
-                    <input type="file" accept="image/*" onChange={handleCategoryThumbUpload} />
+                    <input
+                      type="file"
+                      onChange={handleCategoryThumbUpload}
+                      className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:text-xs file:font-bold file:text-slate-800 cursor-pointer"
+                    />
                     <input
                       type="text"
                       value={editingCategory.imageUrl}
@@ -3579,7 +3589,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
               <div>
                 <label className="block font-bold mb-1">Upload Website Logo</label>
-                <input type="file" accept="image/*" onChange={handleLogoUpload} />
+                <input
+                  type="file"
+                  onChange={handleLogoUpload}
+                  className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-slate-50 file:text-xs file:font-bold file:text-slate-800 cursor-pointer"
+                />
                 {newLogo && <img src={newLogo} alt="Logo preview" className="h-12 mt-2 object-contain" />}
               </div>
               <button

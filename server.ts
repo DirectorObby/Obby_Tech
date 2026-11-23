@@ -111,7 +111,11 @@ function isSafeImageOrUrl(url?: string): boolean {
   if (!trimmed) return true;
   if (trimmed.startsWith('/')) return true;
   if (/^https?:\/\//i.test(trimmed)) return true;
-  if (/^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) {
+  if (
+    /^data:image\/(png|jpeg|jpg|pjpeg|webp|gif|svg\+xml|bmp|avif|heic|heif|tiff|x-icon|vnd\.microsoft\.icon);base64,[A-Za-z0-9+/=]+$/i.test(
+      trimmed
+    )
+  ) {
     return true;
   }
   return false;
@@ -231,9 +235,17 @@ function loadDatabase(): DatabaseState {
   const users: UserAccount[] = Array.isArray(loaded.users)
     ? loaded.users.map((u) => {
         const lower = (u.email || '').trim().toLowerCase();
+        const hadLegacyDefaultAvatar = Boolean(
+          u.photo && u.photo.includes('photo-1535713875002-d1d0cf377fde')
+        );
+        if (hadLegacyDefaultAvatar) {
+          needsSave = true;
+        }
+        const cleanedPhoto = hadLegacyDefaultAvatar ? '' : u.photo;
         if (lower === OFFICIAL_ADMIN_EMAIL) {
           return {
             ...u,
+            photo: cleanedPhoto,
             email: OFFICIAL_ADMIN_EMAIL,
             role: 'admin' as const,
             passwordHash: u.passwordHash && u.passwordHash.includes(':') && !needsSave ? u.passwordHash : adminPasswordHash,
@@ -242,6 +254,7 @@ function loadDatabase(): DatabaseState {
         }
         return {
           ...u,
+          photo: cleanedPhoto,
           role: 'customer' as const,
           mustChangePassword: false,
         };
@@ -997,10 +1010,7 @@ async function startServer() {
         email: verifiedEmail,
         role,
         mustChangePassword: isAdmin ? db.adminMustChangePassword : false,
-        photo:
-          verifiedPhoto && isSafeImageOrUrl(verifiedPhoto)
-            ? verifiedPhoto
-            : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+        photo: verifiedPhoto && isSafeImageOrUrl(verifiedPhoto) ? verifiedPhoto : '',
         authProvider: 'google',
         passwordHash: isAdmin ? db.adminPasswordHash : undefined,
         createdAt: new Date().toISOString(),
@@ -1057,6 +1067,7 @@ async function startServer() {
       region: region ? String(region).trim() : 'Dodoma',
       street: street ? String(street).trim() : '',
       address: address ? String(address).trim() : '',
+      photo: '',
       authProvider: 'email',
       passwordHash: hashPassword(password),
       createdAt: new Date().toISOString(),
@@ -1119,7 +1130,16 @@ async function startServer() {
     if (region !== undefined) user.region = String(region).trim();
     if (street !== undefined) user.street = String(street).trim();
     if (address !== undefined) user.address = String(address).trim();
-    if (photo && isSafeImageOrUrl(photo)) user.photo = String(photo);
+    if (photo !== undefined) {
+      const trimmedPhoto = String(photo).trim();
+      if (!trimmedPhoto) {
+        user.photo = '';
+      } else if (isSafeImageOrUrl(trimmedPhoto)) {
+        user.photo = trimmedPhoto;
+      } else {
+        return res.status(400).json({ error: 'Invalid profile photo image.' });
+      }
+    }
     user.updatedAt = new Date().toISOString();
 
     saveDatabase();

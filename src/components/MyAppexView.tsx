@@ -12,11 +12,14 @@ import {
   Bell,
   ChevronDown,
   Smartphone,
+  Camera,
+  Trash2,
 } from 'lucide-react';
 import { AdminSettings, CustomerProfile } from '../types';
 import { AuthModal } from './AuthModal';
 import { api, isOfficialAdminEmail } from '../services/api';
 import { OBBY_SOCIAL_LINKS, ObbyTechWordmark } from './ObbyTechBrand';
+import { readImageFileAsDataUrl } from '../utils/imageUpload';
 
 interface MyAppexViewProps {
   settings: AdminSettings;
@@ -407,11 +410,15 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
   const [activeSection, setActiveSection] = useState<'info' | 'about' | 'contact' | 'delivery'>('info');
   const [formData, setFormData] = useState<CustomerProfile>(profile);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState('');
   const [profileSavedMsg, setProfileSavedMsg] = useState('');
+  const photoInputRef = React.useRef<HTMLInputElement>(null);
 
   // Sync profile prop to local state when updated
   useEffect(() => {
     setFormData(profile);
+    setPhotoError('');
   }, [profile]);
 
   const isAuthenticated = Boolean(profile && profile.id && profile.email);
@@ -435,6 +442,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
         phone: formData.phone,
         region: formData.region,
         street: formData.street,
+        photo: formData.photo ?? '',
       });
       onSaveProfile(res.user);
       setFormData(res.user);
@@ -444,6 +452,46 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
       console.error('Profile save error:', err);
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleProfilePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError('');
+    setIsUploadingPhoto(true);
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file, {
+        maxDimension: 640,
+        maxRawBytes: 800_000,
+        quality: 0.9,
+      });
+      const res = await api.updateProfile({ photo: dataUrl });
+      onSaveProfile(res.user);
+      setFormData(res.user);
+      setProfileSavedMsg('Profile photo updated!');
+      setTimeout(() => setProfileSavedMsg(''), 2500);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'Unable to upload photo. Please try another photo.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveProfilePhoto = async () => {
+    setPhotoError('');
+    setIsUploadingPhoto(true);
+    try {
+      const res = await api.updateProfile({ photo: '' });
+      onSaveProfile(res.user);
+      setFormData(res.user);
+      setProfileSavedMsg('Profile photo removed.');
+      setTimeout(() => setProfileSavedMsg(''), 2500);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'Unable to remove photo.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -480,17 +528,48 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
   return (
     <div className="bg-[#F2F6FC] min-h-[85vh] pb-24 p-3 max-w-2xl mx-auto space-y-4 animate-fade-in">
       {/* Account Profile Banner Header (Midnight Navy matching Obby Tech logo) */}
-      <div className="bg-[#0C0826] text-white p-4 rounded-2xl shadow-md flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img
-            src={formData.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
-            alt={formData.fullName}
-            className="w-12 h-12 rounded-full object-cover border-2 border-[#29C5F6]/80 shadow-xs"
-          />
-          <div>
+      <div className="bg-[#0C0826] text-white p-4 rounded-2xl shadow-md flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative shrink-0">
+            {formData.photo ? (
+              <img
+                src={formData.photo}
+                alt={formData.fullName}
+                className="w-12 h-12 rounded-full object-cover border-2 border-[#29C5F6]/80 shadow-xs"
+              />
+            ) : (
+              <div
+                aria-label={formData.fullName}
+                className="w-12 h-12 rounded-full bg-[#16123B] border-2 border-[#29C5F6]/70 flex items-center justify-center shadow-xs"
+              >
+                <User className="w-6 h-6 text-[#29C5F6]" />
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={isUploadingPhoto}
+              onClick={() => photoInputRef.current?.click()}
+              title={formData.photo ? 'Change profile photo' : 'Upload profile photo'}
+              aria-label={formData.photo ? 'Change profile photo' : 'Upload profile photo'}
+              className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#29C5F6] hover:bg-[#1ab5e6] text-[#0C0826] flex items-center justify-center border border-[#0C0826] shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {isUploadingPhoto ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Camera className="w-3 h-3" />
+              )}
+            </button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              onChange={handleProfilePhotoUpload}
+              className="hidden"
+            />
+          </div>
+          <div className="min-w-0">
             <h1 className="text-sm font-black tracking-tight flex items-center gap-1.5">
-              <span>{formData.fullName}</span>
-              <CheckCircle2 className="w-4 h-4 text-[#24D164]" />
+              <span className="truncate">{formData.fullName}</span>
+              <CheckCircle2 className="w-4 h-4 text-[#24D164] shrink-0" />
             </h1>
             <p className="text-[11px] text-slate-300 truncate max-w-[220px] sm:max-w-xs">{formData.email}</p>
             <span className="inline-block text-[10px] bg-white/10 text-[#24D164] px-2 py-0.5 rounded-md font-bold mt-0.5">
@@ -501,6 +580,12 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
           </div>
         </div>
       </div>
+
+      {photoError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold p-2.5 rounded-xl">
+          {photoError}
+        </div>
+      )}
 
       {/* Authorized Administrator Dashboard Access */}
       {(formData.role === 'admin' || isOfficialAdminEmail(formData.email)) && (
@@ -638,14 +723,39 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSavingProfile}
-                className="inline-flex items-center gap-1.5 bg-[#0C0826] hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
-              >
-                {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                <span>Save Profile</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isUploadingPhoto}
+                    onClick={() => photoInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 transition-colors cursor-pointer disabled:opacity-60"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-[#0C0826]" />
+                    <span>{formData.photo ? 'Change Photo' : 'Add Profile Photo'}</span>
+                  </button>
+                  {formData.photo && (
+                    <button
+                      type="button"
+                      disabled={isUploadingPhoto}
+                      onClick={handleRemoveProfilePhoto}
+                      className="inline-flex items-center gap-1 text-red-600 hover:bg-red-50 text-xs font-bold px-2.5 py-2 rounded-xl border border-red-200 transition-colors cursor-pointer disabled:opacity-60"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove Photo</span>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="inline-flex items-center gap-1.5 bg-[#0C0826] hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer disabled:opacity-60"
+                >
+                  {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>Save Profile</span>
+                </button>
+              </div>
             </div>
           </form>
         )}
