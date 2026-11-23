@@ -22,6 +22,7 @@ interface MyAppexViewProps {
   settings: AdminSettings;
   profile: CustomerProfile;
   onSaveProfile: (profile: CustomerProfile) => void;
+  onAuthSuccess?: (profile: CustomerProfile, token: string, rememberMe?: boolean) => void;
   language: 'en' | 'sw';
   setLanguage: (lang: 'en' | 'sw') => void;
   onOpenAdmin: () => void;
@@ -399,6 +400,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
   settings,
   profile,
   onSaveProfile,
+  onAuthSuccess,
   onOpenAdmin,
   onSignOut,
 }) => {
@@ -414,8 +416,12 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
 
   const isAuthenticated = Boolean(profile && profile.id && profile.email);
 
-  const handleAuthSuccess = (user: CustomerProfile) => {
-    onSaveProfile(user);
+  const handleAuthSuccess = (user: CustomerProfile, token: string, rememberMe?: boolean) => {
+    if (onAuthSuccess) {
+      onAuthSuccess(user, token, rememberMe);
+    } else {
+      onSaveProfile(user);
+    }
     setFormData(user);
   };
 

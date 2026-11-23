@@ -95,8 +95,11 @@ export default function App() {
   }>({ isOpen: false });
 
   const [pendingTab, setPendingTab] = useState<TabType | null>(null);
-  const [pendingBuyProduct, setPendingBuyProduct] = useState<Product | null>(null);
-  const [pendingBuyQuantity, setPendingBuyQuantity] = useState<number>(1);
+  const pendingCartActionRef = useRef<{
+    product: Product;
+    quantity: number;
+    openCheckout?: boolean;
+  } | null>(null);
   const [pendingBookingService, setPendingBookingService] = useState<ServiceItem | null>(null);
 
   // UI Overlays
@@ -217,7 +220,7 @@ export default function App() {
         setIsNotificationsOpen(false);
       } else if (s.authModalOpen) {
         setPendingTab(null);
-        setPendingBuyProduct(null);
+        pendingCartActionRef.current = null;
         setPendingBookingService(null);
         setPendingBookingShowcaseItem(null);
         setAuthModalState({ isOpen: false });
@@ -313,6 +316,27 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  const mergeItemIntoCart = (baseCart: OrderItem[], product: Product, quantity: number): OrderItem[] => {
+    const existing = baseCart.find((item) => item.productId === product.id);
+    if (existing) {
+      return baseCart.map((item) =>
+        item.productId === product.id
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      );
+    }
+    return [
+      ...baseCart,
+      {
+        productId: product.id,
+        productName: product.name,
+        productImage: product.primaryImage,
+        price: product.price,
+        quantity,
+      },
+    ];
+  };
+
   // Load Storefront & User-Private Data
   const loadData = async () => {
     try {
@@ -333,18 +357,45 @@ export default function App() {
       if (authUser?.id && getAuthToken()) {
         const isAdmin =
           (authUser.role === 'admin' || isOfficialAdminEmail(authUser.email)) && adminUnlocked;
-        const [ordersData, bookingsData, notifsData] = await Promise.all([
+        const [ordersData, bookingsData, notifsData, cartData] = await Promise.all([
           api.getOrders(isAdmin).catch(() => []),
           api.getBookings(isAdmin).catch(() => []),
           api.getNotifications(isAdmin).catch(() => []),
+          api.getCart().catch(() => []),
         ]);
         setOrders(ordersData);
         setBookings(bookingsData);
         setNotifications(notifsData);
+
+        const pendingAction = pendingCartActionRef.current;
+        if (pendingAction) {
+          pendingCartActionRef.current = null;
+          const mergedCart = mergeItemIntoCart(
+            cartData,
+            pendingAction.product,
+            pendingAction.quantity
+          );
+          setCartItems(mergedCart);
+          api.saveCart(mergedCart).catch((err) => console.error('Failed to sync cart:', err));
+          if (pendingAction.openCheckout) {
+            setCheckoutItems([
+              {
+                productId: pendingAction.product.id,
+                productName: pendingAction.product.name,
+                productImage: pendingAction.product.primaryImage,
+                price: pendingAction.product.price,
+                quantity: pendingAction.quantity,
+              },
+            ]);
+          }
+        } else {
+          setCartItems(cartData);
+        }
       } else {
         setOrders([]);
         setBookings([]);
         setNotifications([]);
+        setCartItems([]);
       }
     } catch (err) {
       console.error('Failed to load application data:', err);
@@ -386,6 +437,10 @@ export default function App() {
   // Auth Success Handler
   const handleAuthSuccess = (user: CustomerProfile, token: string, rememberMe: boolean = true) => {
     setAuthToken(token, rememberMe);
+    setOrders([]);
+    setBookings([]);
+    setNotifications([]);
+    setCartItems([]);
     setAuthUser(user);
     const isAdmin = user.role === 'admin' || isOfficialAdminEmail(user.email);
     setAdminUnlocked(isAdmin && user.authProvider === 'email');
@@ -394,22 +449,6 @@ export default function App() {
     if (pendingTab) {
       setActiveTab(pendingTab);
       setPendingTab(null);
-    }
-
-    if (pendingBuyProduct) {
-      const prod = pendingBuyProduct;
-      const qty = pendingBuyQuantity;
-      setPendingBuyProduct(null);
-      handleAddToCart(prod, qty);
-      setCheckoutItems([
-        {
-          productId: prod.id,
-          productName: prod.name,
-          productImage: prod.primaryImage,
-          price: prod.price,
-          quantity: qty,
-        },
-      ]);
     }
 
     if (pendingBookingService) {
@@ -422,7 +461,7 @@ export default function App() {
     }
   };
 
-  // Handle Logout
+  // Handle Logout — immediately hide all account data on screen while keeping it saved on the server for next sign-in
   const handleSignOut = async () => {
     try {
       await api.logout();
@@ -435,46 +474,53 @@ export default function App() {
       // ignore
     }
     clearAuthToken();
+    pendingCartActionRef.current = null;
+    setPendingTab(null);
+    setPendingBookingService(null);
+    setPendingBookingShowcaseItem(null);
+    setAuthModalState({ isOpen: false });
     setAuthUser(null);
     setAdminUnlocked(false);
     setIsAdminDashboardOpen(false);
+    setIsNotificationsOpen(false);
+    setIsChatFullMode(false);
+    setActiveProductDetails(null);
     setActiveBookingService(null);
+    setActiveBookingShowcaseItem(null);
     setCheckoutItems(null);
     setLatestSubmittedOrder(null);
-    setActiveTab('home');
+    setHighlightedOrderId(null);
+    setHighlightedBookingId(null);
+    setSearchInput('');
+    setActiveSearchQuery('');
+    setSelectedCategory('All');
+    setSelectedServiceId(null);
+    setCartItems([]);
     setOrders([]);
     setBookings([]);
     setNotifications([]);
+    setActiveTab('home');
   };
 
-  // Cart Helpers
+  // Cart Helpers (Strictly Per-User Account)
   const handleAddToCart = (product: Product, quantity: number = 1) => {
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.productId === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          productId: product.id,
-          productName: product.name,
-          productImage: product.primaryImage,
-          price: product.price,
-          quantity,
-        },
-      ];
-    });
+    if (!authUser) {
+      pendingCartActionRef.current = { product, quantity, openCheckout: false };
+      setAuthModalState({
+        isOpen: true,
+        subtitle: `Please sign in or create an account to save ${product.name} to your cart`,
+      });
+      return;
+    }
+
+    const nextCart = mergeItemIntoCart(cartItems, product, quantity);
+    setCartItems(nextCart);
+    api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
   };
 
   const handleBuyNow = (product: Product, quantity: number = 1) => {
     if (!authUser) {
-      setPendingBuyProduct(product);
-      setPendingBuyQuantity(quantity);
+      pendingCartActionRef.current = { product, quantity, openCheckout: true };
       setAuthModalState({
         isOpen: true,
         subtitle: `Please sign in to complete your purchase of ${product.name}`,
@@ -482,7 +528,9 @@ export default function App() {
       return;
     }
 
-    handleAddToCart(product, quantity);
+    const nextCart = mergeItemIntoCart(cartItems, product, quantity);
+    setCartItems(nextCart);
+    api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
     setCheckoutItems([
       {
         productId: product.id,
@@ -509,17 +557,22 @@ export default function App() {
   };
 
   const handleUpdateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCartItems((prev) => prev.filter((i) => i.productId !== productId));
-    } else {
-      setCartItems((prev) =>
-        prev.map((i) => (i.productId === productId ? { ...i, quantity } : i))
-      );
+    const nextCart =
+      quantity <= 0
+        ? cartItems.filter((i) => i.productId !== productId)
+        : cartItems.map((i) => (i.productId === productId ? { ...i, quantity } : i));
+    setCartItems(nextCart);
+    if (authUser && getAuthToken()) {
+      api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
     }
   };
 
   const handleRemoveCartItem = (productId: string) => {
-    setCartItems((prev) => prev.filter((i) => i.productId !== productId));
+    const nextCart = cartItems.filter((i) => i.productId !== productId);
+    setCartItems(nextCart);
+    if (authUser && getAuthToken()) {
+      api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
+    }
   };
 
   // Order Submission Flow
@@ -548,10 +601,15 @@ export default function App() {
       });
 
       const submittedIds = new Set(itemsToSubmit.map((i) => i.productId));
+      const remainingCart = cartItems.filter((item) => !submittedIds.has(item.productId));
       setOrders((prev) => [newOrder, ...prev.filter((o) => o.id !== newOrder.id)]);
       setLatestSubmittedOrder(newOrder);
       setCheckoutItems(null);
-      setCartItems((prev) => prev.filter((item) => !submittedIds.has(item.productId)));
+      setCartItems(remainingCart);
+
+      if (authUser && getAuthToken()) {
+        await api.saveCart(remainingCart).catch((err) => console.error('Failed to update cart:', err));
+      }
 
       if (authUser) {
         setAuthUser({
@@ -844,6 +902,7 @@ export default function App() {
 
         {activeTab === 'cart' && (
           <CartView
+            key={`cart-${authUser?.id || 'guest'}`}
             cartItems={cartItems}
             onUpdateQuantity={handleUpdateCartQuantity}
             onRemoveItem={handleRemoveCartItem}
@@ -855,6 +914,7 @@ export default function App() {
 
         {activeTab === 'messenger' && (
           <AppexAiChat
+            key={`chat-${authUser?.id || 'guest'}`}
             customerPhone={customerProfile.phone}
             isFullMode={isChatFullMode}
             onEnterFullMode={() => setIsChatFullMode(true)}
@@ -868,6 +928,7 @@ export default function App() {
 
         {activeTab === 'orders' && (
           <OrdersView
+            key={`orders-${authUser?.id || 'guest'}`}
             orders={orders}
             bookings={bookings}
             paymentSettings={settings.paymentSettings}
@@ -889,6 +950,7 @@ export default function App() {
 
         {activeTab === 'myappex' && (
           <MyAppexView
+            key={`myobby-${authUser?.id || 'guest'}`}
             settings={settings}
             profile={customerProfile}
             onSaveProfile={(prof) => {
@@ -898,6 +960,7 @@ export default function App() {
                 setAdminUnlocked(true);
               }
             }}
+            onAuthSuccess={handleAuthSuccess}
             language={language}
             setLanguage={setLanguage}
             onOpenAdmin={() => setIsAdminDashboardOpen(true)}
@@ -978,7 +1041,7 @@ export default function App() {
           websiteLogo={settings.websiteLogo}
           onClose={() => {
             setPendingTab(null);
-            setPendingBuyProduct(null);
+            pendingCartActionRef.current = null;
             setPendingBookingService(null);
             setPendingBookingShowcaseItem(null);
             setAuthModalState({ isOpen: false });

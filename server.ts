@@ -19,6 +19,7 @@ import {
   CategoryItem,
   CustomerNotification,
   Order,
+  OrderItem,
   Product,
   PromoBanner,
   ServiceBooking,
@@ -46,6 +47,7 @@ export interface UserAccount {
   address?: string;
   authProvider: 'google' | 'facebook' | 'email';
   passwordHash?: string;
+  cart?: OrderItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -364,7 +366,7 @@ function getSessionFromRequest(req: express.Request): { session: SessionRecord; 
 }
 
 function sanitizeUser(user: UserAccount) {
-  const { passwordHash: _, ...safeUser } = user;
+  const { passwordHash: _, cart: _cart, ...safeUser } = user;
   const isAdmin = isOfficialAdmin(user.email);
   return {
     ...safeUser,
@@ -1215,6 +1217,51 @@ async function startServer() {
     });
   });
 
+  // --- PRIVATE PER-USER CART API ---
+
+  app.get('/api/cart', requireAuth, (req: AuthedRequest, res) => {
+    const user = req.authUser!;
+    const saved = Array.isArray(user.cart) ? user.cart : [];
+    const hydrated: OrderItem[] = saved.map((item) => {
+      const catalogProd = db.products.find((p) => p.id === item.productId);
+      return {
+        productId: String(item.productId),
+        productName: catalogProd ? catalogProd.name : String(item.productName),
+        productImage: catalogProd ? catalogProd.primaryImage : String(item.productImage || ''),
+        price: catalogProd ? catalogProd.price : Number(item.price || 0),
+        quantity: Math.max(1, Number(item.quantity || 1)),
+      };
+    });
+    res.json(hydrated);
+  });
+
+  app.put('/api/cart', requireAuth, (req: AuthedRequest, res) => {
+    const user = req.authUser!;
+    const incoming = Array.isArray(req.body?.items) ? req.body.items : [];
+
+    const sanitizedCart: OrderItem[] = incoming
+      .filter((item: any) => item && item.productId)
+      .map((item: any) => {
+        const catalogProd = db.products.find((p) => p.id === item.productId);
+        return {
+          productId: String(item.productId),
+          productName: catalogProd ? catalogProd.name : String(item.productName || 'Product'),
+          productImage: catalogProd
+            ? catalogProd.primaryImage
+            : isSafeImageOrUrl(item.productImage)
+            ? String(item.productImage || '')
+            : '',
+          price: catalogProd ? catalogProd.price : Math.max(0, Number(item.price || 0)),
+          quantity: Math.max(1, Math.floor(Number(item.quantity || 1))),
+        };
+      });
+
+    user.cart = sanitizedCart;
+    user.updatedAt = new Date().toISOString();
+    saveDatabase();
+    res.json(sanitizedCart);
+  });
+
   // --- ORDERS API (STRICT PER-USER & ADMIN PRIVACY) ---
 
   app.get('/api/orders', requireAuth, (req: AuthedRequest, res) => {
@@ -1242,8 +1289,11 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing required customer order fields' });
     }
 
-    const orderNum = Math.floor(1000 + Math.random() * 9000);
-    const orderId = `APX${orderNum}`;
+    let orderId = '';
+    do {
+      const orderNum = Math.floor(1000 + Math.random() * 9000);
+      orderId = `APX${orderNum}`;
+    } while (db.orders.some((o) => o.id === orderId));
 
     let subtotal = 0;
     const processedItems = items.map((item: any) => {
@@ -1349,7 +1399,9 @@ async function startServer() {
       order.paymentNumber = String(resolvedNum);
       order.updatedAt = new Date().toISOString();
 
-      const customerNotif = db.notifications.find((n) => n.orderId === order.id && n.type === 'order_received');
+      const customerNotif = db.notifications.find(
+        (n) => n.orderId === order.id && n.type === 'order_received' && n.userId === order.customerId
+      );
       if (customerNotif) {
         customerNotif.message = `Your order #${order.id} has been received. We are waiting for your payment.\n\nPayment No: ${resolvedNum}`;
       }
@@ -1469,8 +1521,11 @@ async function startServer() {
       return res.status(400).json({ error: 'Please complete all required booking fields.' });
     }
 
-    const randomCode = Math.floor(100000 + Math.random() * 900000);
-    const bookingRef = `BK-${randomCode}`;
+    let bookingRef = '';
+    do {
+      const randomCode = Math.floor(100000 + Math.random() * 900000);
+      bookingRef = `BK-${randomCode}`;
+    } while (db.bookings.some((b) => b.id === bookingRef));
     const now = new Date().toISOString();
 
     const newBooking: ServiceBooking = {

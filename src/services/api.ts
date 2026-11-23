@@ -7,6 +7,7 @@ import {
   CustomerProfile,
   DeliveryStatus,
   Order,
+  OrderItem,
   PaymentStatus,
   Product,
   PromoBanner,
@@ -430,6 +431,26 @@ export const api = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to delete AI instruction');
+    return data;
+  },
+
+  // Per-User Cart Persistence
+  getCart: async (): Promise<OrderItem[]> => {
+    const res = await fetch('/api/cart', {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch cart');
+    return res.json();
+  },
+
+  saveCart: async (items: OrderItem[]): Promise<OrderItem[]> => {
+    const res = await fetch('/api/cart', {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ items }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to save cart');
     return data;
   },
 
