@@ -1,0 +1,536 @@
+import {
+  AIInstruction,
+  AdminSettings,
+  CategoryItem,
+  Product,
+  PromoBanner,
+  ServiceItem,
+} from '../types';
+
+export const INITIAL_CATEGORIES: CategoryItem[] = [
+  {
+    id: 'cat-1',
+    name: 'Phones',
+    icon: '📱',
+    iconType: 'emoji',
+    description: 'Smartphones & Mobile Devices',
+    imageUrl: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-2',
+    name: 'PC & Laptops',
+    icon: '💻',
+    iconType: 'emoji',
+    description: 'High Performance Computers & Laptops',
+    imageUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-3',
+    name: 'CCTV',
+    icon: '📹',
+    iconType: 'emoji',
+    description: 'Security Cameras & CCTV Systems',
+    imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-4',
+    name: 'Accessories',
+    icon: '🔌',
+    iconType: 'emoji',
+    description: 'Chargers, Cables, Powerbanks & Audio',
+    imageUrl: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400&auto=format&fit=crop&q=80',
+  },
+  {
+    id: 'cat-5',
+    name: 'Services',
+    icon: '🛠️',
+    iconType: 'emoji',
+    description: 'Phone & PC Repair, Graphic Design, Ads & Tech Consultation',
+    imageUrl: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&auto=format&fit=crop&q=80',
+  },
+];
+
+export const INITIAL_SERVICES: ServiceItem[] = [
+  {
+    id: 'srv-mobile-repair',
+    slug: 'mobile-phone-repair',
+    title: 'Mobile Phone Repair',
+    description: 'Professional diagnosis, troubleshooting, software installation, and hardware repair.',
+    iconName: 'Smartphone',
+    requiresDeviceDetails: true,
+    coverImage: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-mob-1',
+        title: 'Screen & Display Replacement',
+        description: 'Original OLED & LCD screen replacement for iPhone, Samsung, Tecno, Infinix, and Xiaomi with touch & True Tone testing.',
+        price: 45000,
+        priceLabel: 'From TSh 45,000',
+        image: 'https://images.unsplash.com/photo-1597740985671-2a8a3b80502e?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-mob-2',
+        title: 'Battery, Charging Port & Software Flash',
+        description: 'Fast battery replacement, charging IC repair, OS flashing, FRP/network troubleshooting, and full board diagnostics.',
+        price: 25000,
+        priceLabel: 'From TSh 25,000',
+        image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+  {
+    id: 'srv-computer-repair',
+    slug: 'computer-laptop-repair',
+    title: 'Computer & Laptop Repair',
+    description: 'Computer troubleshooting, maintenance, software installation, and hardware solutions.',
+    iconName: 'Laptop',
+    requiresDeviceDetails: true,
+    coverImage: 'https://images.unsplash.com/photo-1588702547919-26089e690ecc?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-pc-1',
+        title: 'Windows / macOS & Software Setup',
+        description: 'Clean Windows 10/11 or macOS installation, Microsoft Office, antivirus protection, drivers, and system speed optimization.',
+        price: 30000,
+        priceLabel: 'From TSh 30,000',
+        image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-pc-2',
+        title: 'Hardware Upgrade & Motherboard Service',
+        description: 'SSD & RAM upgrades, keyboard/screen replacement, thermal paste servicing, hinge repair, and power circuit diagnostics.',
+        price: 40000,
+        priceLabel: 'From TSh 40,000',
+        image: 'https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+  {
+    id: 'srv-graphic-design',
+    slug: 'graphic-design',
+    title: 'Graphic Design Services',
+    description: 'Professional posters, flyers, logos, banners, and other creative designs.',
+    iconName: 'Palette',
+    requiresDeviceDetails: false,
+    coverImage: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-gfx-1',
+        title: 'Event Posters, Flyers & Social Banners',
+        description: 'High-resolution promotional posters, church/event flyers, product cards, and print-ready banners designed to stand out.',
+        price: 20000,
+        priceLabel: 'TSh 20,000',
+        image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-gfx-2',
+        title: 'Logo Design & Complete Brand Identity',
+        description: 'Custom vector business logo, color palette, business card, letterhead, and brand kit delivered in PNG, PDF & AI/SVG.',
+        price: 60000,
+        priceLabel: 'From TSh 60,000',
+        image: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+  {
+    id: 'srv-business-ads',
+    slug: 'business-advertising',
+    title: 'Business Advertising & Promotion',
+    description: 'Creating professional business advertisements, promotional posters, marketing graphics, and digital advertising materials.',
+    iconName: 'Megaphone',
+    requiresDeviceDetails: false,
+    coverImage: 'https://images.unsplash.com/photo-1557838923-2985c318be48?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-ads-1',
+        title: 'Social Media Ad Campaign Pack',
+        description: 'Weekly promotional graphics for Instagram, WhatsApp Status, and Facebook designed to drive direct customer inquiries.',
+        price: 50000,
+        priceLabel: 'From TSh 50,000',
+        image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-ads-2',
+        title: 'Product Catalog & Motion Promo',
+        description: 'Digital product showcase sheets, offer banners, and promotional visuals tailored for shops, salons, and online brands.',
+        price: 35000,
+        priceLabel: 'From TSh 35,000',
+        image: 'https://images.unsplash.com/photo-1557838923-2985c318be48?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+  {
+    id: 'srv-tech-consultation',
+    slug: 'tech-consultation',
+    title: 'Technology Consultation & Digital Education',
+    description: 'Providing technology advice, technical support, digital skills guidance, and educational assistance to individuals and businesses.',
+    iconName: 'GraduationCap',
+    requiresDeviceDetails: false,
+    coverImage: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-con-1',
+        title: '1-on-1 Business IT & Digital Strategy',
+        description: 'Guidance on choosing business laptops, CCTV setups, POS tools, cloud backups, and online store workflows.',
+        price: 25000,
+        priceLabel: 'TSh 25,000 / session',
+        image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-con-2',
+        title: 'Digital Skills & Productivity Training',
+        description: 'Practical coaching on office productivity tools, smartphone business management, cybersecurity basics, and AI workflows.',
+        price: 30000,
+        priceLabel: 'From TSh 30,000',
+        image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+  {
+    id: 'srv-video-photo',
+    slug: 'video-photo-shooting',
+    title: 'Video & Photo Shooting',
+    description: 'Professional event coverage, studio photography, product shoots, and 4K promotional video production.',
+    iconName: 'Camera',
+    requiresDeviceDetails: false,
+    coverImage: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80',
+    showcaseItems: [
+      {
+        id: 'sh-vid-1',
+        title: 'Event & Studio Photography Package',
+        description: 'High-resolution photography for weddings, graduations, corporate events, and studio portraits with full color retouching.',
+        price: 80000,
+        priceLabel: 'From TSh 80,000',
+        image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80',
+      },
+      {
+        id: 'sh-vid-2',
+        title: 'Commercial Video Shoot & 4K Editing',
+        description: 'Cinematic business commercials, music/event highlights, social media reels, and clean audio & color grading.',
+        price: 150000,
+        priceLabel: 'From TSh 150,000',
+        image: 'https://images.unsplash.com/photo-1579632652768-6cb9dcf85912?w=800&auto=format&fit=crop&q=80',
+      },
+    ],
+  },
+];
+
+export const INITIAL_BANNERS: PromoBanner[] = [
+  {
+    id: 'slide-phones',
+    image: '/src/assets/images/promo_obby_phones_1795203874089.jpg',
+    kickerEn: 'OBBY TECH · SMARTPHONES & AUDIO',
+    kickerSw: 'OBBY TECH · SIMU NA VIFAA VYA SAUTI',
+    titleEn: 'Flagship Phones & Fast Accessories',
+    titleSw: 'Simu za Kisasa & Vifaa Halisi',
+    subtitleEn: 'Original iPhone, Samsung & fast chargers delivered across Tanzania.',
+    subtitleSw: 'iPhone, Samsung na chaja halisi zinazofika mikoa yote Tanzania.',
+    ctaEn: 'Shop Phones',
+    ctaSw: 'Nunua Simu',
+    targetCategory: 'Phones',
+    enabled: true,
+    order: 1,
+    createdAt: '2026-11-20T00:00:00.000Z',
+    updatedAt: '2026-11-20T00:00:00.000Z',
+  },
+  {
+    id: 'slide-laptops',
+    image: '/src/assets/images/promo_obby_laptops_1795203874834.jpg',
+    kickerEn: 'OBBY TECH · BUSINESS & STUDY',
+    kickerSw: 'OBBY TECH · KAZI NA MASOMO',
+    titleEn: 'High-Performance Laptops',
+    titleSw: 'Laptop Imara za Kazi na Chuo',
+    subtitleEn: 'Lenovo ThinkPad, HP ProBook & Surface laptops ready for work.',
+    subtitleSw: 'Lenovo ThinkPad, HP ProBook na Surface zilizokaguliwa kwa ubora.',
+    ctaEn: 'Explore Laptops',
+    ctaSw: 'Tazama Laptop',
+    targetCategory: 'PC & Laptops',
+    enabled: true,
+    order: 2,
+    createdAt: '2026-11-20T00:00:00.000Z',
+    updatedAt: '2026-11-20T00:00:00.000Z',
+  },
+  {
+    id: 'slide-security',
+    image: '/src/assets/images/promo_obby_security_1795203872863.jpg',
+    kickerEn: 'OBBY TECH · SECURITY & POWER',
+    kickerSw: 'OBBY TECH · ULINZI NA CHAJI',
+    titleEn: 'Smart CCTV & Power Solutions',
+    titleSw: 'Kamera za Ulinzi & Powerbank',
+    subtitleEn: 'Protect your home and business with HD CCTV kits & 20,000mAh power.',
+    subtitleSw: 'Linda nyumba na biashara yako kwa mifumo ya CCTV na powerbank kubwa.',
+    ctaEn: 'View CCTV Kits',
+    ctaSw: 'Angalia CCTV',
+    targetCategory: 'CCTV',
+    enabled: true,
+    order: 3,
+    createdAt: '2026-11-20T00:00:00.000Z',
+    updatedAt: '2026-11-20T00:00:00.000Z',
+  },
+];
+
+export const INITIAL_AI_INSTRUCTIONS: AIInstruction[] = [
+  {
+    id: 'ai-inst-1',
+    title: 'Promote OBBY TECH Services & Booking',
+    instruction:
+      'Whenever a customer asks about phone repairs, laptop repairs, graphic design, business promotion posters, or IT consultation, explain the relevant OBBY TECH service clearly and invite them to book directly from the Services category.',
+    enabled: true,
+    createdAt: '2026-11-20T00:00:00.000Z',
+    updatedAt: '2026-11-20T00:00:00.000Z',
+  },
+  {
+    id: 'ai-inst-2',
+    title: 'Strict Pricing & Stock Honesty',
+    instruction:
+      'Always quote exact prices in TSh from the live catalog and never invent stock or unverified discounts. For Dodoma delivery, mention same/next-day arrangement; for outside Dodoma, clearly explain the TSh 10,000 transport fee.',
+    enabled: true,
+    createdAt: '2026-11-20T00:00:00.000Z',
+    updatedAt: '2026-11-20T00:00:00.000Z',
+  },
+];
+
+export const INITIAL_PRODUCTS: Product[] = [
+  {
+    id: 'apx-p1',
+    name: 'Laptop Lenovo ThinkPad T440s 8GB Intel Core I5',
+    category: 'PC & Laptops',
+    price: 400000,
+    description: 'Reliable Lenovo ThinkPad T440s equipped with Intel Core i5 processor, 8GB RAM, fast SSD storage, and crisp 14-inch HD display. Perfect for office work, business, and students.',
+    specifications: [
+      'Intel Core i5 4th Gen Processor',
+      '8GB DDR3 RAM',
+      '256GB SSD High Speed Storage',
+      '14" HD Anti-Glare Display',
+      'Dual Battery System with Long Backup',
+      'Original Lenovo Charger Included'
+    ],
+    stock: 12,
+    availability: 'IN_STOCK',
+    condition: 'Refurbished',
+    images: [
+      'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Dodoma Mjini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p2',
+    name: 'Oraimo Type C Fast Charger 18W',
+    category: 'Accessories',
+    price: 15000,
+    description: 'Original Oraimo Type-C ultra fast wall charger. Features intelligent temperature control, surge protection, and durable braided cable.',
+    specifications: [
+      '18W Quick Charge 3.0',
+      'Type-C Cable Included (1 Meter)',
+      'Fire-Proof ABS Casing',
+      'Compatible with Samsung, iPhone, Tecno, Infinix, Xiaomi'
+    ],
+    stock: 45,
+    availability: 'IN_STOCK',
+    condition: 'Brand New',
+    images: [
+      'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Uhindini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p3',
+    name: 'Laptop Microsoft Surface Laptop SE 8GB Intel Celeron',
+    category: 'PC & Laptops',
+    price: 420000,
+    description: 'Sleek and lightweight Microsoft Surface Laptop SE. Ideal for web browsing, virtual meetings, typing documents, and general productivity.',
+    specifications: [
+      'Intel Celeron Quad Core Processor',
+      '8GB RAM',
+      '128GB High Speed eMMC Storage',
+      '11.6" High Definition Screen',
+      'Windows 11 Home Edition Installed',
+      'Up to 10 hours battery battery life'
+    ],
+    stock: 8,
+    availability: 'IN_STOCK',
+    condition: 'Refurbished',
+    images: [
+      'https://images.unsplash.com/photo-1544731612-de7f96afe55f?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1544731612-de7f96afe55f?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Makole',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p4',
+    name: 'iPhone 11 128GB Black Edition',
+    category: 'Phones',
+    price: 750000,
+    description: 'Apple iPhone 11 128GB in pristine condition. Dual 12MP ultra-wide and wide cameras, A13 Bionic chip, Face ID, and liquid retina display.',
+    specifications: [
+      '128GB Storage Capacity',
+      'A13 Bionic Chip with Neural Engine',
+      '6.1" Liquid Retina HD Display',
+      'Dual 12MP Ultra Wide and Wide Cameras',
+      'Battery Health 88%+',
+      'Face ID & True Tone Active'
+    ],
+    stock: 6,
+    availability: 'IN_STOCK',
+    condition: 'Refurbished',
+    images: [
+      'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1592750475338-74b7b21085ab?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Uhindini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p5',
+    name: 'Hikvision 4-Camera Wireless Security CCTV Kit',
+    category: 'CCTV',
+    price: 680000,
+    description: 'Complete Hikvision Full HD 1080p CCTV Camera System with 4 night vision weatherproof cameras, 1TB Security Hard Drive, and Mobile Remote Monitoring support.',
+    specifications: [
+      '4 x 1080P Full HD Outdoor/Indoor Infrared Cameras',
+      '1TB Western Digital Surveillance Hard Drive',
+      '4-Channel DVR System with HDMI Output',
+      'Night Vision up to 30 Meters',
+      'Hik-Connect App Live Phone View Everywhere',
+      'Power Supply Adapters & BNC Cables Included'
+    ],
+    stock: 10,
+    availability: 'IN_STOCK',
+    condition: 'Brand New',
+    images: [
+      'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Dodoma Mjini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p6',
+    name: 'Samsung Galaxy A24 128GB 6GB RAM',
+    category: 'Phones',
+    price: 520000,
+    description: 'Brand new Samsung Galaxy A24 featuring 50MP OIS Triple Camera, Super AMOLED 90Hz Display, 5000mAh long battery life, and fast charging.',
+    specifications: [
+      '128GB Storage, 6GB RAM',
+      '6.5" Super AMOLED 90Hz Display',
+      '50MP OIS Triple Main Camera System',
+      '5000mAh Battery with 25W Fast Charge',
+      'Side Fingerprint Sensor & NFC',
+      'Official Samsung 1 Year Warranty'
+    ],
+    stock: 15,
+    availability: 'IN_STOCK',
+    condition: 'Brand New',
+    images: [
+      'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1580910051074-3eb694886505?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Makole',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p7',
+    name: 'HP ProBook 450 G5 Intel Core i5 8GB 256GB SSD',
+    category: 'PC & Laptops',
+    price: 620000,
+    description: 'Durable HP ProBook 450 G5 laptop featuring an Intel Core i5 8th Gen CPU, 8GB DDR4 RAM, 256GB SSD, and 15.6" screen with numeric keypad.',
+    specifications: [
+      'Intel Core i5 8th Generation CPU',
+      '8GB DDR4 RAM (Expandable)',
+      '256GB NVMe SSD Fast Storage',
+      '15.6" HD Anti-Glare Display with Full Keypad',
+      'USB Type-C, HDMI, SD Card Reader, Wi-Fi 5',
+      'Original HP Charger Included'
+    ],
+    stock: 5,
+    availability: 'IN_STOCK',
+    condition: 'Refurbished',
+    images: [
+      'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Uhindini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'apx-p8',
+    name: 'Anker PowerCore 20,000mAh Powerbank',
+    category: 'Accessories',
+    price: 85000,
+    description: 'Ultra high capacity Anker 20000mAh PowerBank. Dual USB ports with PowerIQ technology to charge phones and tablets simultaneously at top speed.',
+    specifications: [
+      '20000mAh Lithium Polymer Battery',
+      'PowerIQ and VoltageBoost Fast Charging',
+      'Dual USB Output (Simultaneous Charge)',
+      'MultiProtect Safety System against surges',
+      'Micro-USB & Type-C Recharge Inputs'
+    ],
+    stock: 20,
+    availability: 'IN_STOCK',
+    condition: 'Brand New',
+    images: [
+      'https://images.unsplash.com/photo-1609592424082-841f391a27e7?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80'
+    ],
+    primaryImage: 'https://images.unsplash.com/photo-1609592424082-841f391a27e7?w=800&auto=format&fit=crop&q=80',
+    location: 'Dodoma, Dodoma Mjini',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
+];
+
+export const INITIAL_ADMIN_SETTINGS: AdminSettings = {
+  websiteLogo: '',
+  websiteName: 'OBBY TECH',
+  paymentSettings: {
+    mpesa: { enabled: true, number: '0755123456' },
+    tigoPesa: { enabled: true, number: '0655123456' },
+    airtelMoney: { enabled: true, number: '0788123456' },
+    haloPesa: { enabled: true, number: '0622123456' },
+    bank: {
+      enabled: true,
+      bankName: 'CRDB Bank Tanzania',
+      accountName: 'OBBY TECH',
+      accountNumber: '0150123456700'
+    }
+  },
+  contactSettings: {
+    phone: '+255779594321',
+    whatsapp: '+255713340900',
+    email: 'obbyitmasters@gmail.com',
+    socialMedia: 'Instagram: @ObbyTech | Facebook: Obby Tech',
+    aboutText: 'Obby Tech is a premier, trusted technology company in Dodoma, Tanzania specializing in quality Smartphones, Laptops, PCs, Security CCTV Systems, Electronics Accessories, Device Repairs, Graphic Design, Business Promotion, and Technology Consultation.'
+  },
+  deliverySettings: {
+    darFee: 0,
+    outsideDarFee: 10000,
+    instructions: 'For customers outside Dodoma: Pay TSh 10,000 transport fee after placing the order. Package will be sent via regional bus/transport station for collection.'
+  },
+  servicesBanner: {
+    kicker: 'OBBY TECH · TECHNICAL & CREATIVE STUDIO',
+    title: 'Professional Repairs, Graphic Design, Video & IT Solutions',
+    subtitle: 'Explore our specialized service categories with real work samples, transparent prices, and instant appointment booking.',
+    ctaText: 'View Our Services',
+    imageUrl: '',
+  },
+};
