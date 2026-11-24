@@ -167,9 +167,12 @@ function saveImageBufferToUploads(buf: Buffer, ext: string, prefix = 'img'): str
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
   }
   const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'img';
-  const filename = `${safePrefix}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}.${ext}`;
+  const hash = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16);
+  const filename = `${safePrefix}_${hash}.${ext}`;
   const fullPath = path.join(UPLOADS_DIR, filename);
-  fs.writeFileSync(fullPath, buf);
+  if (!fs.existsSync(fullPath)) {
+    fs.writeFileSync(fullPath, buf);
+  }
   return `/uploads/${filename}`;
 }
 
@@ -235,14 +238,13 @@ function getPaymentNumberForMethod(paymentMethod: string, settings: AdminSetting
 }
 
 function mergeCategories(existing?: CategoryItem[]): CategoryItem[] {
-  const base = Array.isArray(existing) && existing.length > 0 ? [...existing] : [...INITIAL_CATEGORIES];
-  for (const defCat of INITIAL_CATEGORIES) {
-    const hasCat = base.some((c) => c.name.toLowerCase() === defCat.name.toLowerCase());
-    if (!hasCat) {
-      base.push(defCat);
-    }
+  if (Array.isArray(existing) && existing.length > 0) {
+    return existing.map((c) => ({
+      ...c,
+      iconType: c.iconType || 'emoji',
+    }));
   }
-  return base.map((c) => ({
+  return INITIAL_CATEGORIES.map((c) => ({
     ...c,
     iconType: c.iconType || 'emoji',
   }));
@@ -1124,6 +1126,129 @@ async function startServer() {
     };
     saveDatabase();
     res.json(db.settings);
+  });
+
+  // Export & Restore Admin-Saved Store Configuration (Admin-only safeguard across updates/deployments)
+  app.get('/api/admin/backup', requireAdmin, (_req, res) => {
+    res.json({
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: db.settings,
+      banners: db.banners,
+      categories: db.categories,
+      services: db.services,
+      products: db.products,
+      aiInstructions: db.aiInstructions,
+    });
+  });
+
+  app.post('/api/admin/restore', requireAdmin, requireAdminPasswordUpdated, (req, res) => {
+    const { settings: incomingSettings, banners, categories, services, products, aiInstructions } = req.body || {};
+
+    if (incomingSettings && typeof incomingSettings === 'object') {
+      const cleanLogo =
+        incomingSettings.websiteLogo !== undefined && isSafeImageOrUrl(incomingSettings.websiteLogo)
+          ? persistDataUrlToUploads(String(incomingSettings.websiteLogo), 'logo')
+          : db.settings.websiteLogo;
+      const cleanSvcBanner = incomingSettings.servicesBanner
+        ? {
+            ...(db.settings.servicesBanner || INITIAL_ADMIN_SETTINGS.servicesBanner!),
+            ...incomingSettings.servicesBanner,
+            imageUrl:
+              incomingSettings.servicesBanner.imageUrl !== undefined &&
+              isSafeImageOrUrl(incomingSettings.servicesBanner.imageUrl)
+                ? persistDataUrlToUploads(String(incomingSettings.servicesBanner.imageUrl), 'svcbanner')
+                : db.settings.servicesBanner?.imageUrl,
+          }
+        : db.settings.servicesBanner;
+
+      db.settings = {
+        ...db.settings,
+        ...incomingSettings,
+        websiteLogo: cleanLogo,
+        paymentSettings: incomingSettings.paymentSettings
+          ? { ...db.settings.paymentSettings, ...incomingSettings.paymentSettings }
+          : db.settings.paymentSettings,
+        contactSettings: incomingSettings.contactSettings
+          ? { ...db.settings.contactSettings, ...incomingSettings.contactSettings }
+          : db.settings.contactSettings,
+        deliverySettings: incomingSettings.deliverySettings
+          ? { ...db.settings.deliverySettings, ...incomingSettings.deliverySettings }
+          : db.settings.deliverySettings,
+        servicesBanner: cleanSvcBanner,
+      };
+    }
+
+    if (Array.isArray(banners)) {
+      db.banners = banners
+        .filter((b: any) => b && b.image && isSafeImageOrUrl(b.image))
+        .map((b: any) => ({
+          ...b,
+          image: persistDataUrlToUploads(String(b.image), 'banner'),
+        }));
+    }
+
+    if (Array.isArray(categories) && categories.length > 0) {
+      db.categories = categories.map((c: any) => ({
+        ...c,
+        iconType: c.iconType || 'emoji',
+        icon:
+          (c.iconType === 'image' || String(c.icon || '').startsWith('data:image/')) &&
+          isSafeImageOrUrl(c.icon)
+            ? persistDataUrlToUploads(String(c.icon), 'caticon')
+            : c.icon,
+        imageUrl:
+          c.imageUrl && isSafeImageOrUrl(c.imageUrl)
+            ? persistDataUrlToUploads(String(c.imageUrl), 'cat')
+            : c.imageUrl,
+      }));
+    }
+
+    if (Array.isArray(services)) {
+      db.services = services.map((srv: any) => ({
+        ...srv,
+        coverImage:
+          srv.coverImage && isSafeImageOrUrl(srv.coverImage)
+            ? persistDataUrlToUploads(String(srv.coverImage), 'srv')
+            : srv.coverImage || '',
+        showcaseItems: Array.isArray(srv.showcaseItems)
+          ? srv.showcaseItems.map((it: any) => ({
+              ...it,
+              image:
+                it.image && isSafeImageOrUrl(it.image)
+                  ? persistDataUrlToUploads(String(it.image), 'srvitem')
+                  : it.image || '',
+            }))
+          : [],
+      }));
+    }
+
+    if (Array.isArray(products)) {
+      const dedupe = new Map<string, string>();
+      db.products = products.map((p: any) => {
+        const imgs = Array.isArray(p.images)
+          ? p.images
+              .filter((img: string) => isSafeImageOrUrl(img))
+              .map((img: string) => persistDataUrlToUploads(img, 'prod', dedupe))
+          : [];
+        const prim =
+          p.primaryImage && isSafeImageOrUrl(p.primaryImage)
+            ? persistDataUrlToUploads(p.primaryImage, 'prod', dedupe)
+            : imgs[0] || '';
+        return {
+          ...p,
+          images: imgs,
+          primaryImage: prim,
+        };
+      });
+    }
+
+    if (Array.isArray(aiInstructions)) {
+      db.aiInstructions = aiInstructions;
+    }
+
+    saveDatabase();
+    res.json({ success: true });
   });
 
   // --- AUTHENTICATION ROUTES ---

@@ -6,21 +6,28 @@ import { INITIAL_BANNERS } from '../data/initialData';
 interface PromoBannerCarouselProps {
   language: 'en' | 'sw';
   banners?: PromoBanner[];
+  hasLoadedFromServer?: boolean;
   onSelectCategory: (category: CategoryName | 'All') => void;
 }
 
 export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
   language,
   banners,
+  hasLoadedFromServer = false,
   onSelectCategory,
 }) => {
   const slides = useMemo(() => {
-    const source = banners && banners.length > 0 ? banners : INITIAL_BANNERS;
+    const source = hasLoadedFromServer
+      ? banners || []
+      : banners && banners.length > 0
+      ? banners
+      : INITIAL_BANNERS;
     const active = source
       .filter((b) => b.enabled !== false)
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    if (hasLoadedFromServer) return active;
     return active.length > 0 ? active : INITIAL_BANNERS;
-  }, [banners]);
+  }, [banners, hasLoadedFromServer]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -64,10 +71,12 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
     setIsPaused(false);
   };
 
+  if (slides.length === 0) return null;
+
   return (
-    <section className="bg-[#F2F6FC] px-3 pt-3 pb-1">
+    <section className="bg-[#F2F6FC] w-full">
       <div
-        className="relative max-w-4xl mx-auto rounded-xl overflow-hidden bg-white shadow-xs group aspect-video"
+        className="relative w-full rounded-none overflow-hidden bg-white shadow-xs group aspect-video"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}

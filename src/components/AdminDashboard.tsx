@@ -25,6 +25,8 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Download,
+  Upload,
 } from 'lucide-react';
 import {
   AIInstruction,
@@ -165,6 +167,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [settings]);
 
+  const ADMIN_VAULT_KEY = 'obby_admin_store_vault_v1';
+  const [vaultSnapshot, setVaultSnapshot] = useState<{
+    exportedAt: string;
+    settings?: AdminSettings;
+    banners?: PromoBanner[];
+    categories?: CategoryItem[];
+    services?: ServiceItem[];
+    products?: Product[];
+    aiInstructions?: AIInstruction[];
+  } | null>(() => {
+    try {
+      const raw = localStorage.getItem(ADMIN_VAULT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
+
+  const syncAdminVaultFromServer = async () => {
+    if (!isVerifiedAdmin) return;
+    try {
+      const snapshot = await api.exportAdminBackup();
+      try {
+        localStorage.setItem(ADMIN_VAULT_KEY, JSON.stringify(snapshot));
+      } catch {
+        // ignore quota limits if any
+      }
+      setVaultSnapshot(snapshot);
+    } catch {
+      // ignore background backup failures
+    }
+  };
+
   const loadAdminData = async () => {
     if (!isVerifiedAdmin || !isAuthenticated) return;
     setIsLoadingAdminData(true);
@@ -183,6 +219,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setBanners(bannersData);
       setCategories(catsData);
       setAiInstructions(aiData);
+      if (bannersData.length > 0) {
+        // Keep local backup up-to-date when server already holds admin changes
+        const isServerDefaultNumbers =
+          settings.paymentSettings?.mpesa?.number === '0755123456' &&
+          settings.paymentSettings?.tigoPesa?.number === '0655123456';
+        const hasCustomizedVault = Boolean(
+          vaultSnapshot?.settings?.paymentSettings &&
+            (vaultSnapshot.settings.paymentSettings.mpesa?.number !== '0755123456' ||
+              vaultSnapshot.settings.paymentSettings.tigoPesa?.number !== '0655123456' ||
+              (vaultSnapshot.settings.paymentSettings.customMethods?.length || 0) > 0)
+        );
+        if (!isServerDefaultNumbers || !hasCustomizedVault) {
+          syncAdminVaultFromServer();
+        }
+      }
     } finally {
       setIsLoadingAdminData(false);
     }
@@ -294,6 +345,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await api.updateSettings({ servicesBanner: servicesBannerForm });
       showToast('Home Page Services Banner updated successfully!');
       onRefreshData();
+      syncAdminVaultFromServer();
     } catch (err: any) {
       showToast(err.message || 'Failed to save Home Page Services Banner', 'error');
     }
@@ -434,6 +486,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setProductToDelete(null);
       showToast('Product deleted.');
       onRefreshData();
+      syncAdminVaultFromServer();
     } catch (err: any) {
       showToast(err.message || 'Failed to delete product', 'error');
     }
@@ -714,6 +767,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       setEditingCategory(null);
       onRefreshData();
+      syncAdminVaultFromServer();
       showToast(`Category "${updated.name}" updated!`);
     } catch (err: any) {
       showToast(err.message || 'Failed to update category', 'error');
@@ -784,6 +838,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       showToast('Branding updated!');
       onRefreshData();
+      syncAdminVaultFromServer();
     } catch (err: any) {
       showToast(err.message || 'Failed to update branding', 'error');
     }
@@ -802,17 +857,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
-  const handleSaveSettings = async () => {
+  const persistSettings = async (nextSettings: AdminSettings, successMessage = 'Settings saved successfully!') => {
     try {
-      await api.updateSettings(settingsForm);
-      showToast('Settings saved successfully!');
+      const saved = await api.updateSettings(nextSettings);
+      setSettingsForm(saved);
+      showToast(successMessage);
       onRefreshData();
+      syncAdminVaultFromServer();
     } catch (err: any) {
       showToast(err.message || 'Failed to save settings', 'error');
     }
   };
 
-  const handleAddCustomPaymentMethod = (e: React.FormEvent) => {
+  const handleSaveSettings = async () => {
+    await persistSettings(settingsForm, 'Settings saved successfully!');
+  };
+
+  const handleAddCustomPaymentMethod = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMethodName || !newMethodNumber) return;
 
@@ -826,34 +887,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
 
     const currentCustom = settingsForm.paymentSettings.customMethods || [];
-    setSettingsForm({
+    const nextSettings: AdminSettings = {
       ...settingsForm,
       paymentSettings: {
         ...settingsForm.paymentSettings,
         customMethods: [...currentCustom, newMethod],
       },
-    });
+    };
+    setSettingsForm(nextSettings);
 
     setNewMethodName('');
     setNewMethodProvider('');
     setNewMethodNumber('');
     setNewMethodAccountName('');
+    await persistSettings(nextSettings, `Payment method "${newMethod.name}" saved!`);
   };
 
-  const handleDeleteCustomPaymentMethod = (idToDelete: string) => {
+  const handleDeleteCustomPaymentMethod = async (idToDelete: string) => {
     const currentCustom = settingsForm.paymentSettings.customMethods || [];
-    setSettingsForm({
+    const nextSettings: AdminSettings = {
       ...settingsForm,
       paymentSettings: {
         ...settingsForm.paymentSettings,
         customMethods: currentCustom.filter((m) => m.id !== idToDelete),
       },
-    });
+    };
+    setSettingsForm(nextSettings);
+    await persistSettings(nextSettings, 'Payment method removed & saved.');
   };
 
   const handleSaveAndAddPayment = async () => {
     await handleSaveSettings();
     setShowAddPaymentForm(true);
+  };
+
+  const handleDownloadAdminBackup = async () => {
+    try {
+      const snapshot = await api.exportAdminBackup();
+      try {
+        localStorage.setItem(ADMIN_VAULT_KEY, JSON.stringify(snapshot));
+      } catch {
+        // ignore storage limits
+      }
+      setVaultSnapshot(snapshot);
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `obby-tech-admin-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Backup file downloaded!');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to download backup', 'error');
+    }
+  };
+
+  const handleRestoreSnapshot = async (snapshotToRestore: any) => {
+    if (!snapshotToRestore) return;
+    setIsRestoringBackup(true);
+    try {
+      await api.restoreAdminBackup(snapshotToRestore);
+      if (snapshotToRestore.settings) {
+        setSettingsForm(snapshotToRestore.settings);
+      }
+      await loadAdminData();
+      onRefreshData();
+      await syncAdminVaultFromServer();
+      showToast('Admin settings, payment numbers & banners restored!');
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to restore admin backup', 'error');
+    } finally {
+      setIsRestoringBackup(false);
+    }
+  };
+
+  const handleUploadBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      await handleRestoreSnapshot(parsed);
+    } catch (err: any) {
+      showToast(err?.message || 'Invalid backup file.', 'error');
+    }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -1310,6 +1431,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Admin Saved Data Backup & Auto-Recovery Vault */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 uppercase">
+                      Admin Store Backup &amp; Protection
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Protects your saved payment numbers, banners, logo, contacts, categories, services &amp; products across app updates.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDownloadAdminBackup}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Save Backup (.json)
+                    </button>
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg font-bold cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" /> Restore File
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={handleUploadBackupFile}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {vaultSnapshot?.settings?.paymentSettings &&
+                  settings.paymentSettings?.mpesa?.number === '0755123456' &&
+                  vaultSnapshot.settings.paymentSettings.mpesa?.number !== '0755123456' && (
+                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] text-amber-900">
+                        <strong>Saved Admin Data Found on This Device</strong> (from{' '}
+                        {new Date(vaultSnapshot.exportedAt).toLocaleString()}). Restore your saved payment numbers &amp; banners in one click.
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isRestoringBackup}
+                        onClick={() => handleRestoreSnapshot(vaultSnapshot)}
+                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold cursor-pointer disabled:opacity-60"
+                      >
+                        {isRestoringBackup ? 'Restoring...' : 'Restore My Saved Data'}
+                      </button>
+                    </div>
+                  )}
               </div>
             </div>
           )}
@@ -1902,8 +2074,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 </div>
 
-                {/* Live Mini Preview (16:9) */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white rounded-xl aspect-video max-w-md p-4 flex flex-col justify-end">
+                {/* Live Mini Preview (16:9 Sharp Corners) */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white rounded-none aspect-video w-full max-w-md p-4 flex flex-col justify-end">
                   {servicesBannerForm.imageUrl && (
                     <img
                       src={servicesBannerForm.imageUrl}
@@ -2918,15 +3090,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setEditingPaymentKey(editingPaymentKey === 'mpesa' ? null : 'mpesa')}
+                        onClick={() => {
+                          if (editingPaymentKey === 'mpesa') {
+                            setEditingPaymentKey(null);
+                            persistSettings(settingsForm, 'Vodacom M-Pesa number saved!');
+                          } else {
+                            setEditingPaymentKey('mpesa');
+                          }
+                        }}
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {editingPaymentKey === 'mpesa' ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSettingsForm({
+                        onClick={() => {
+                          const nextSettings: AdminSettings = {
                             ...settingsForm,
                             paymentSettings: {
                               ...settingsForm.paymentSettings,
@@ -2935,8 +3114,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 enabled: !settingsForm.paymentSettings.mpesa.enabled,
                               },
                             },
-                          })
-                        }
+                          };
+                          setSettingsForm(nextSettings);
+                          persistSettings(nextSettings, 'M-Pesa status updated!');
+                        }}
                         className="px-2.5 py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {settingsForm.paymentSettings.mpesa.enabled ? 'Disable' : 'Enable'}
@@ -3001,15 +3182,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setEditingPaymentKey(editingPaymentKey === 'tigoPesa' ? null : 'tigoPesa')}
+                        onClick={() => {
+                          if (editingPaymentKey === 'tigoPesa') {
+                            setEditingPaymentKey(null);
+                            persistSettings(settingsForm, 'Mixx by Yas number saved!');
+                          } else {
+                            setEditingPaymentKey('tigoPesa');
+                          }
+                        }}
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {editingPaymentKey === 'tigoPesa' ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSettingsForm({
+                        onClick={() => {
+                          const nextSettings: AdminSettings = {
                             ...settingsForm,
                             paymentSettings: {
                               ...settingsForm.paymentSettings,
@@ -3018,8 +3206,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 enabled: !settingsForm.paymentSettings.tigoPesa.enabled,
                               },
                             },
-                          })
-                        }
+                          };
+                          setSettingsForm(nextSettings);
+                          persistSettings(nextSettings, 'Mixx by Yas status updated!');
+                        }}
                         className="px-2.5 py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {settingsForm.paymentSettings.tigoPesa.enabled ? 'Disable' : 'Enable'}
@@ -3084,15 +3274,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setEditingPaymentKey(editingPaymentKey === 'airtelMoney' ? null : 'airtelMoney')}
+                        onClick={() => {
+                          if (editingPaymentKey === 'airtelMoney') {
+                            setEditingPaymentKey(null);
+                            persistSettings(settingsForm, 'Airtel Money number saved!');
+                          } else {
+                            setEditingPaymentKey('airtelMoney');
+                          }
+                        }}
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {editingPaymentKey === 'airtelMoney' ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSettingsForm({
+                        onClick={() => {
+                          const nextSettings: AdminSettings = {
                             ...settingsForm,
                             paymentSettings: {
                               ...settingsForm.paymentSettings,
@@ -3101,8 +3298,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 enabled: !(settingsForm.paymentSettings.airtelMoney?.enabled ?? true),
                               },
                             },
-                          })
-                        }
+                          };
+                          setSettingsForm(nextSettings);
+                          persistSettings(nextSettings, 'Airtel Money status updated!');
+                        }}
                         className="px-2.5 py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {settingsForm.paymentSettings.airtelMoney?.enabled ?? true ? 'Disable' : 'Enable'}
@@ -3175,15 +3374,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setEditingPaymentKey(editingPaymentKey === 'haloPesa' ? null : 'haloPesa')}
+                        onClick={() => {
+                          if (editingPaymentKey === 'haloPesa') {
+                            setEditingPaymentKey(null);
+                            persistSettings(settingsForm, 'HaloPesa number saved!');
+                          } else {
+                            setEditingPaymentKey('haloPesa');
+                          }
+                        }}
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {editingPaymentKey === 'haloPesa' ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSettingsForm({
+                        onClick={() => {
+                          const nextSettings: AdminSettings = {
                             ...settingsForm,
                             paymentSettings: {
                               ...settingsForm.paymentSettings,
@@ -3192,8 +3398,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 enabled: !(settingsForm.paymentSettings.haloPesa?.enabled ?? true),
                               },
                             },
-                          })
-                        }
+                          };
+                          setSettingsForm(nextSettings);
+                          persistSettings(nextSettings, 'HaloPesa status updated!');
+                        }}
                         className="px-2.5 py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {settingsForm.paymentSettings.haloPesa?.enabled ?? true ? 'Disable' : 'Enable'}
@@ -3266,15 +3474,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => setEditingPaymentKey(editingPaymentKey === 'bank' ? null : 'bank')}
+                        onClick={() => {
+                          if (editingPaymentKey === 'bank') {
+                            setEditingPaymentKey(null);
+                            persistSettings(settingsForm, 'Bank account saved!');
+                          } else {
+                            setEditingPaymentKey('bank');
+                          }
+                        }}
                         className="px-2.5 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {editingPaymentKey === 'bank' ? 'Done' : 'Edit'}
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setSettingsForm({
+                        onClick={() => {
+                          const nextSettings: AdminSettings = {
                             ...settingsForm,
                             paymentSettings: {
                               ...settingsForm.paymentSettings,
@@ -3283,8 +3498,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 enabled: !(settingsForm.paymentSettings.bank?.enabled ?? true),
                               },
                             },
-                          })
-                        }
+                          };
+                          setSettingsForm(nextSettings);
+                          persistSettings(nextSettings, 'Bank status updated!');
+                        }}
                         className="px-2.5 py-1 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold cursor-pointer"
                       >
                         {settingsForm.paymentSettings.bank?.enabled ?? true ? 'Disable' : 'Enable'}

@@ -594,6 +594,42 @@ export const api = {
     return data;
   },
 
+  exportAdminBackup: async (): Promise<{
+    version: number;
+    exportedAt: string;
+    settings: AdminSettings;
+    banners: PromoBanner[];
+    categories: CategoryItem[];
+    services: ServiceItem[];
+    products: Product[];
+    aiInstructions: AIInstruction[];
+  }> => {
+    const res = await fetch('/api/admin/backup', {
+      headers: getAuthHeaders(),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to export admin backup');
+    return data;
+  },
+
+  restoreAdminBackup: async (snapshot: {
+    settings?: Partial<AdminSettings>;
+    banners?: PromoBanner[];
+    categories?: CategoryItem[];
+    services?: ServiceItem[];
+    products?: Product[];
+    aiInstructions?: AIInstruction[];
+  }): Promise<{ success: boolean }> => {
+    const res = await fetch('/api/admin/restore', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(snapshot),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to restore admin backup');
+    return data;
+  },
+
   // Admin Auth
   adminLogin: async (password: string): Promise<{ success: boolean; token?: string; mustChangePassword?: boolean }> => {
     const res = await fetch('/api/admin/login', {

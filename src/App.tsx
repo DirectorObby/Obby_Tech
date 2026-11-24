@@ -65,6 +65,7 @@ export default function App() {
   const [categories, setCategories] = useState<CategoryItem[]>(INITIAL_CATEGORIES);
   const [services, setServices] = useState<ServiceItem[]>(INITIAL_SERVICES);
   const [banners, setBanners] = useState<PromoBanner[]>(INITIAL_BANNERS);
+  const [hasLoadedServerData, setHasLoadedServerData] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<ServiceBooking[]>([]);
   const [notifications, setNotifications] = useState<CustomerNotification[]>([]);
@@ -341,18 +342,21 @@ export default function App() {
   const loadData = async () => {
     try {
       const [prodsData, settingsData, catsData, srvsData, bannersData] = await Promise.all([
-        api.getProducts(),
-        api.getSettings().catch(() => INITIAL_ADMIN_SETTINGS),
-        api.getCategories().catch(() => INITIAL_CATEGORIES),
-        api.getServices().catch(() => INITIAL_SERVICES),
-        api.getBanners().catch(() => INITIAL_BANNERS),
+        api.getProducts().catch(() => null),
+        api.getSettings().catch(() => null),
+        api.getCategories().catch(() => null),
+        api.getServices().catch(() => null),
+        api.getBanners().catch(() => null),
       ]);
 
-      setProducts(prodsData);
-      setSettings(settingsData);
-      setCategories(catsData);
-      setServices(srvsData);
-      setBanners(bannersData);
+      if (prodsData) setProducts(prodsData);
+      if (settingsData) setSettings(settingsData);
+      if (catsData) setCategories(catsData);
+      if (srvsData) setServices(srvsData);
+      if (bannersData) {
+        setBanners(bannersData);
+        setHasLoadedServerData(true);
+      }
 
       if (authUser?.id && getAuthToken()) {
         const isAdmin =
@@ -734,6 +738,7 @@ export default function App() {
               <PromoBannerCarousel
                 language={language}
                 banners={banners}
+                hasLoadedFromServer={hasLoadedServerData}
                 onSelectCategory={(cat) => {
                   setSelectedCategory(cat);
                   setSelectedServiceId(null);
@@ -863,19 +868,21 @@ export default function App() {
                     )
                   )}
 
-                  {/* Home Page Large "View Our Services" Banner ('All') OR Matching Search Services */}
+                  {/* Home Page Large "View Our Services" Banner ('All') — Edge-to-Edge 16:9 */}
                   {selectedCategory === 'All' && !activeSearchQuery && (
-                    <ServicesHomeBanner
-                      language={language}
-                      servicesCount={services.length}
-                      bannerConfig={settings.servicesBanner}
-                      onOpenServices={() => {
-                        setSelectedCategory('Services');
-                        setSelectedServiceId(null);
-                        const el = document.getElementById('home-products-section');
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                    />
+                    <div className="-mx-3">
+                      <ServicesHomeBanner
+                        language={language}
+                        servicesCount={services.length}
+                        bannerConfig={settings.servicesBanner}
+                        onOpenServices={() => {
+                          setSelectedCategory('Services');
+                          setSelectedServiceId(null);
+                          const el = document.getElementById('home-products-section');
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                      />
+                    </div>
                   )}
 
                   {activeSearchQuery && filteredServices.length > 0 && (

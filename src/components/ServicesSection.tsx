@@ -83,7 +83,7 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
   const bgImage = bannerConfig?.imageUrl?.trim();
 
   return (
-    <section className="pt-2">
+    <section className="w-full pt-2">
       <div
         onClick={onOpenServices}
         role="button"
@@ -94,7 +94,7 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
             onOpenServices();
           }
         }}
-        className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white shadow-sm cursor-pointer group aspect-video"
+        className="relative w-full overflow-hidden rounded-none bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white shadow-xs cursor-pointer group aspect-video"
       >
         {bgImage && (
           <img
