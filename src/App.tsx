@@ -32,6 +32,20 @@ import {
   onAuthStateChanged,
 } from './lib/firebase';
 import {
+  deleteNotificationInFirestore,
+  fetchBookingsFromFirestore,
+  fetchCartFromFirestore,
+  fetchNotificationsFromFirestore,
+  fetchOrdersFromFirestore,
+  fetchStorefrontFromFirestore,
+  isFirebaseUserVerified,
+  markNotificationReadInFirestore,
+  saveCartToFirestore,
+  upsertBookingInFirestore,
+  upsertOrderInFirestore,
+  upsertUserProfileInFirestore,
+} from './lib/firestoreStore';
+import {
   AdminSettings,
   CategoryItem,
   CustomerNotification,
@@ -338,10 +352,11 @@ export default function App() {
     ];
   };
 
-  // Load Storefront & User-Private Data
+  // Load Storefront & User-Private Data (Cloud Firestore primary + server API fallback)
   const loadData = async () => {
     try {
-      const [prodsData, settingsData, catsData, srvsData, bannersData] = await Promise.all([
+      const [fsData, prodsData, settingsData, catsData, srvsData, bannersData] = await Promise.all([
+        fetchStorefrontFromFirestore().catch(() => null),
         api.getProducts().catch(() => null),
         api.getSettings().catch(() => null),
         api.getCategories().catch(() => null),
@@ -349,38 +364,82 @@ export default function App() {
         api.getBanners().catch(() => null),
       ]);
 
-      if (prodsData) setProducts(prodsData);
-      if (settingsData) setSettings(settingsData);
-      if (catsData) setCategories(catsData);
-      if (srvsData) setServices(srvsData);
-      if (bannersData) {
-        setBanners(bannersData);
+      const hasCloudStore = Boolean(fsData?.settings);
+
+      if (hasCloudStore && fsData) {
+        if (fsData.settings) setSettings(fsData.settings);
+        setProducts(fsData.products);
+        if (fsData.categories.length > 0) setCategories(fsData.categories);
+        else if (catsData) setCategories(catsData);
+        if (fsData.services.length > 0) setServices(fsData.services);
+        else if (srvsData) setServices(srvsData);
+        setBanners(fsData.banners);
         setHasLoadedServerData(true);
+      } else {
+        if (fsData && fsData.products.length > 0) setProducts(fsData.products);
+        else if (prodsData) setProducts(prodsData);
+
+        if (fsData?.settings) setSettings(fsData.settings);
+        else if (settingsData) setSettings(settingsData);
+
+        if (fsData && fsData.categories.length > 0) setCategories(fsData.categories);
+        else if (catsData) setCategories(catsData);
+
+        if (fsData && fsData.services.length > 0) setServices(fsData.services);
+        else if (srvsData) setServices(srvsData);
+
+        if (fsData && fsData.banners.length > 0) {
+          setBanners(fsData.banners);
+          setHasLoadedServerData(true);
+        } else if (bannersData) {
+          setBanners(bannersData);
+          setHasLoadedServerData(true);
+        }
       }
 
       if (authUser?.id && getAuthToken()) {
         const isAdmin =
           (authUser.role === 'admin' || isOfficialAdminEmail(authUser.email)) && adminUnlocked;
-        const [ordersData, bookingsData, notifsData, cartData] = await Promise.all([
-          api.getOrders(isAdmin).catch(() => []),
-          api.getBookings(isAdmin).catch(() => []),
-          api.getNotifications(isAdmin).catch(() => []),
-          api.getCart().catch(() => []),
-        ]);
-        setOrders(ordersData);
-        setBookings(bookingsData);
-        setNotifications(notifsData);
+        const canUseCloudUser = isFirebaseUserVerified();
+
+        const [ordersData, bookingsData, notifsData, cartData, fsOrders, fsBookings, fsNotifs, fsCart] =
+          await Promise.all([
+            api.getOrders(isAdmin).catch(() => []),
+            api.getBookings(isAdmin).catch(() => []),
+            api.getNotifications(isAdmin).catch(() => []),
+            api.getCart().catch(() => []),
+            canUseCloudUser ? fetchOrdersFromFirestore(isAdmin).catch(() => []) : Promise.resolve([]),
+            canUseCloudUser ? fetchBookingsFromFirestore(isAdmin).catch(() => []) : Promise.resolve([]),
+            canUseCloudUser ? fetchNotificationsFromFirestore(isAdmin).catch(() => []) : Promise.resolve([]),
+            canUseCloudUser ? fetchCartFromFirestore().catch(() => null) : Promise.resolve(null),
+          ]);
+
+        // Merge server & Firestore orders/bookings/notifications without duplicates
+        const mergeById = <T extends { id: string }>(primary: T[], secondary: T[]): T[] => {
+          const map = new Map<string, T>();
+          secondary.forEach((item) => map.set(item.id, item));
+          primary.forEach((item) => map.set(item.id, item));
+          return Array.from(map.values());
+        };
+
+        setOrders(mergeById(fsOrders, ordersData));
+        setBookings(mergeById(fsBookings, bookingsData));
+        setNotifications(mergeById(fsNotifs, notifsData));
+
+        const resolvedCart =
+          fsCart && fsCart.length > 0 ? fsCart : cartData;
 
         const pendingAction = pendingCartActionRef.current;
         if (pendingAction) {
           pendingCartActionRef.current = null;
           const mergedCart = mergeItemIntoCart(
-            cartData,
+            resolvedCart,
             pendingAction.product,
             pendingAction.quantity
           );
           setCartItems(mergedCart);
           api.saveCart(mergedCart).catch((err) => console.error('Failed to sync cart:', err));
+          saveCartToFirestore(mergedCart).catch(() => {});
           if (pendingAction.openCheckout) {
             setCheckoutItems([
               {
@@ -393,7 +452,7 @@ export default function App() {
             ]);
           }
         } else {
-          setCartItems(cartData);
+          setCartItems(resolvedCart);
         }
       } else {
         setOrders([]);
@@ -520,6 +579,7 @@ export default function App() {
     const nextCart = mergeItemIntoCart(cartItems, product, quantity);
     setCartItems(nextCart);
     api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
+    saveCartToFirestore(nextCart).catch(() => {});
   };
 
   const handleBuyNow = (product: Product, quantity: number = 1) => {
@@ -535,6 +595,7 @@ export default function App() {
     const nextCart = mergeItemIntoCart(cartItems, product, quantity);
     setCartItems(nextCart);
     api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
+    saveCartToFirestore(nextCart).catch(() => {});
     setCheckoutItems([
       {
         productId: product.id,
@@ -568,6 +629,7 @@ export default function App() {
     setCartItems(nextCart);
     if (authUser && getAuthToken()) {
       api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
+      saveCartToFirestore(nextCart).catch(() => {});
     }
   };
 
@@ -576,6 +638,7 @@ export default function App() {
     setCartItems(nextCart);
     if (authUser && getAuthToken()) {
       api.saveCart(nextCart).catch((err) => console.error('Failed to save cart:', err));
+      saveCartToFirestore(nextCart).catch(() => {});
     }
   };
 
@@ -603,6 +666,7 @@ export default function App() {
         paymentMethod: customerData.paymentMethod,
         paymentNumber: customerData.paymentNumber,
       });
+      upsertOrderInFirestore(newOrder).catch(() => {});
 
       const submittedIds = new Set(itemsToSubmit.map((i) => i.productId));
       const remainingCart = cartItems.filter((item) => !submittedIds.has(item.productId));
@@ -613,17 +677,20 @@ export default function App() {
 
       if (authUser && getAuthToken()) {
         await api.saveCart(remainingCart).catch((err) => console.error('Failed to update cart:', err));
+        saveCartToFirestore(remainingCart).catch(() => {});
       }
 
       if (authUser) {
-        setAuthUser({
+        const updatedProf: CustomerProfile = {
           ...authUser,
           fullName: customerData.fullName,
           phone: customerData.phone,
           region: customerData.region,
           street: customerData.street,
           email: customerData.email || authUser.email,
-        });
+        };
+        setAuthUser(updatedProf);
+        upsertUserProfileInFirestore(updatedProf).catch(() => {});
       }
 
       loadData();
@@ -670,6 +737,7 @@ export default function App() {
     try {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       await api.deleteNotification(id);
+      deleteNotificationInFirestore(id).catch(() => {});
     } catch (e) {
       console.error('Failed to delete notification:', e);
       loadData();
@@ -1071,6 +1139,7 @@ export default function App() {
           }}
           onBookingCreated={(saved) => {
             setBookings((prev) => [saved, ...prev.filter((b) => b.id !== saved.id)]);
+            upsertBookingInFirestore(saved).catch(() => {});
             loadData();
           }}
           onViewBookings={(bookingId) => {
@@ -1115,6 +1184,7 @@ export default function App() {
           onClose={() => setLatestSubmittedOrder(null)}
           onOrderUpdated={(updated) => {
             setLatestSubmittedOrder(updated);
+            upsertOrderInFirestore(updated).catch(() => {});
             loadData();
           }}
           onViewOrders={() => {
@@ -1156,6 +1226,7 @@ export default function App() {
           onClose={() => setIsNotificationsOpen(false)}
           onMarkRead={async (id) => {
             await api.markNotificationRead(id);
+            markNotificationReadInFirestore(id).catch(() => {});
             loadData();
           }}
           onDeleteNotification={handleDeleteNotification}

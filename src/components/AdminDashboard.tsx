@@ -27,6 +27,8 @@ import {
   EyeOff,
   Download,
   Upload,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import {
   AIInstruction,
@@ -46,6 +48,34 @@ import {
   ServiceShowcaseItem,
 } from '../types';
 import { api, isOfficialAdminEmail } from '../services/api';
+import {
+  auth,
+  firebaseSignOut,
+  googleProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+} from '../lib/firebase';
+import {
+  deleteAiInstructionInFirestore,
+  deleteBannerInFirestore,
+  deleteBookingInFirestore,
+  deleteOrderInFirestore,
+  deleteProductInFirestore,
+  deleteServiceInFirestore,
+  ensureAdminRegistryInFirestore,
+  fetchAiInstructionsFromFirestore,
+  fetchStorefrontFromFirestore,
+  isFirebaseAdminVerified,
+  saveSettingsToFirestore,
+  syncFullStorefrontToFirestore,
+  upsertAiInstructionInFirestore,
+  upsertBannerInFirestore,
+  upsertBookingInFirestore,
+  upsertCategoryInFirestore,
+  upsertOrderInFirestore,
+  upsertProductInFirestore,
+  upsertServiceInFirestore,
+} from '../lib/firestoreStore';
 import { renderCategoryLucideIcon } from './RecommendedCategories';
 import { renderServiceIcon } from './ServicesSection';
 import { ObbyTechLogoEmblem, ObbyTechWordmark } from './ObbyTechBrand';
@@ -185,6 +215,95 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   });
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(() =>
+    isFirebaseAdminVerified()
+  );
+  const [isConnectingCloud, setIsConnectingCloud] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, () => {
+      setIsCloudConnected(isFirebaseAdminVerified());
+    });
+    return () => unsub();
+  }, []);
+
+  const handleConnectCloudDatabase = async () => {
+    setIsConnectingCloud(true);
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const signedEmail = (cred.user?.email || '').trim().toLowerCase();
+      if (!cred.user?.emailVerified || !isOfficialAdminEmail(signedEmail)) {
+        await firebaseSignOut(auth).catch(() => {});
+        setIsCloudConnected(false);
+        showToast(
+          'Please sign in with the verified official admin Google account (obbyitmasters@gmail.com).',
+          'error'
+        );
+        return;
+      }
+
+      setIsCloudConnected(true);
+      await ensureAdminRegistryInFirestore();
+
+      const [fsData, fsAi] = await Promise.all([
+        fetchStorefrontFromFirestore().catch(() => null),
+        fetchAiInstructionsFromFirestore().catch(() => []),
+      ]);
+
+      const isServerDefaultNumbers =
+        settings.paymentSettings?.mpesa?.number === '0755123456' &&
+        settings.paymentSettings?.tigoPesa?.number === '0655123456';
+
+      if (fsData?.settings) {
+        if (isServerDefaultNumbers) {
+          await api.restoreAdminBackup({
+            settings: fsData.settings,
+            banners: fsData.banners,
+            categories: fsData.categories,
+            services: fsData.services,
+            products: fsData.products,
+            aiInstructions: fsAi,
+          });
+          setSettingsForm(fsData.settings);
+          setNewLogo(fsData.settings.websiteLogo || '');
+          setBrandingName(fsData.settings.websiteName || 'OBBY TECH');
+        } else {
+          const liveBackup = await api.exportAdminBackup().catch(() => null);
+          if (liveBackup) {
+            await syncFullStorefrontToFirestore(liveBackup);
+          }
+        }
+      } else {
+        const liveBackup = await api.exportAdminBackup().catch(() => null);
+        const sourceSnapshot =
+          isServerDefaultNumbers && vaultSnapshot?.settings
+            ? vaultSnapshot
+            : liveBackup || {
+                settings: settingsForm,
+                products,
+                categories,
+                services: servicesList,
+                banners,
+                aiInstructions,
+              };
+        await syncFullStorefrontToFirestore(sourceSnapshot);
+        if (isServerDefaultNumbers && vaultSnapshot?.settings) {
+          await api.restoreAdminBackup(vaultSnapshot).catch(() => {});
+        }
+      }
+
+      await loadAdminData();
+      onRefreshData();
+      await syncAdminVaultFromServer();
+      showToast('Cloud Firestore connected! All admin changes are now permanently saved.');
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        showToast(err?.message || 'Could not connect Cloud Database.', 'error');
+      }
+    } finally {
+      setIsConnectingCloud(false);
+    }
+  };
 
   const syncAdminVaultFromServer = async () => {
     if (!isVerifiedAdmin) return;
@@ -342,7 +461,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSaveServicesBanner = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.updateSettings({ servicesBanner: servicesBannerForm });
+      const saved = await api.updateSettings({ servicesBanner: servicesBannerForm });
+      await saveSettingsToFirestore(saved);
       showToast('Home Page Services Banner updated successfully!');
       onRefreshData();
       syncAdminVaultFromServer();
@@ -462,13 +582,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
 
     try {
+      let savedProduct: Product;
       if (editingProduct.id) {
-        await api.updateProduct(editingProduct.id, payload);
+        savedProduct = await api.updateProduct(editingProduct.id, payload);
         showToast('Product updated successfully!');
       } else {
-        await api.createProduct(payload);
+        savedProduct = await api.createProduct(payload);
         showToast('New product added successfully!');
       }
+      await upsertProductInFirestore(savedProduct);
       setEditingProduct(null);
       setProductImages([]);
       setSpecsText('');
@@ -483,6 +605,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!productToDelete) return;
     try {
       await api.deleteProduct(productToDelete.id);
+      await deleteProductInFirestore(productToDelete.id);
       setProductToDelete(null);
       showToast('Product deleted.');
       onRefreshData();
@@ -499,6 +622,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   ) => {
     try {
       const updated = await api.updateOrderStatus(orderId, statusUpdates);
+      await upsertOrderInFirestore(updated);
       setAdminOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
       showToast(`Order #${orderId} updated.`);
       onRefreshData();
@@ -512,6 +636,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       setIsDeletingOrder(true);
       await api.deleteOrder(orderToDelete.id);
+      await deleteOrderInFirestore(orderToDelete.id);
       setAdminOrders((prev) => prev.filter((o) => o.id !== orderToDelete.id));
       setOrderToDelete(null);
       showToast('Order deleted.');
@@ -531,6 +656,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   ) => {
     try {
       const updated = await api.updateBookingStatus(bookingId, { status, adminNotes });
+      await upsertBookingInFirestore(updated);
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? updated : b)));
       showToast(`Booking #${bookingId} marked as ${status}.`);
       onRefreshData();
@@ -548,6 +674,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!bookingToDelete) return;
     try {
       await api.deleteBooking(bookingToDelete.id);
+      await deleteBookingInFirestore(bookingToDelete.id);
       setBookings((prev) => prev.filter((b) => b.id !== bookingToDelete.id));
       setBookingToDelete(null);
       showToast('Booking deleted.');
@@ -619,13 +746,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
     try {
+      let savedService: ServiceItem;
       if (editingService.id) {
-        await api.updateService(editingService.id, editingService);
+        savedService = await api.updateService(editingService.id, editingService);
         showToast('Service category & showcase updated!');
       } else {
-        await api.createService(editingService);
+        savedService = await api.createService(editingService);
         showToast('New service category added!');
       }
+      await upsertServiceInFirestore(savedService);
       setEditingService(null);
       await loadAdminData();
       onRefreshData();
@@ -638,6 +767,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!serviceToDelete) return;
     try {
       await api.deleteService(serviceToDelete.id);
+      await deleteServiceInFirestore(serviceToDelete.id);
       setServicesList((prev) => prev.filter((s) => s.id !== serviceToDelete.id));
       setServiceToDelete(null);
       showToast('Service category deleted.');
@@ -673,13 +803,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         titleEn: (editingBanner.titleEn || '').trim(),
         titleSw: (editingBanner.titleSw || '').trim(),
       };
+      let savedBanner: PromoBanner;
       if (editingBanner.id) {
-        await api.updateBanner(editingBanner.id, payload);
+        savedBanner = await api.updateBanner(editingBanner.id, payload);
         showToast('Banner slide updated!');
       } else {
-        await api.createBanner(payload);
+        savedBanner = await api.createBanner(payload);
         showToast('New banner slide added!');
       }
+      await upsertBannerInFirestore(savedBanner);
       setEditingBanner(null);
       await loadAdminData();
       onRefreshData();
@@ -695,10 +827,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const current = sorted[index];
     const swap = sorted[targetIdx];
     try {
-      await Promise.all([
+      const [u1, u2] = await Promise.all([
         api.updateBanner(current.id, { order: targetIdx + 1 }),
         api.updateBanner(swap.id, { order: index + 1 }),
       ]);
+      await Promise.all([upsertBannerInFirestore(u1), upsertBannerInFirestore(u2)]);
       await loadAdminData();
       onRefreshData();
     } catch (err: any) {
@@ -710,6 +843,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!bannerToDelete) return;
     try {
       await api.deleteBanner(bannerToDelete.id);
+      await deleteBannerInFirestore(bannerToDelete.id);
       setBannerToDelete(null);
       await loadAdminData();
       onRefreshData();
@@ -764,6 +898,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         imageUrl: editingCategory.imageUrl,
         description: editingCategory.description,
       });
+      await upsertCategoryInFirestore(updated);
       setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       setEditingCategory(null);
       onRefreshData();
@@ -784,6 +919,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         instruction: newAiText.trim(),
         enabled: true,
       });
+      await upsertAiInstructionInFirestore(created);
       setAiInstructions((prev) => [created, ...prev]);
       setNewAiTitle('');
       setNewAiText('');
@@ -802,6 +938,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         instruction: editingAiItem.instruction,
         enabled: editingAiItem.enabled,
       });
+      await upsertAiInstructionInFirestore(updated);
       setAiInstructions((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
       setEditingAiItem(null);
       showToast('AI instruction updated!');
@@ -813,6 +950,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleToggleAiInstruction = async (item: AIInstruction) => {
     try {
       const updated = await api.updateAiInstruction(item.id, { enabled: !item.enabled });
+      await upsertAiInstructionInFirestore(updated);
       setAiInstructions((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
     } catch (err: any) {
       showToast(err.message || 'Failed to toggle AI instruction', 'error');
@@ -822,6 +960,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleDeleteAiInstruction = async (id: string) => {
     try {
       await api.deleteAiInstruction(id);
+      await deleteAiInstructionInFirestore(id);
       setAiInstructions((prev) => prev.filter((i) => i.id !== id));
       showToast('AI instruction removed.');
     } catch (err: any) {
@@ -832,10 +971,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Branding & Settings helpers
   const handleSaveBranding = async () => {
     try {
-      await api.updateSettings({
+      const saved = await api.updateSettings({
         websiteLogo: newLogo,
         websiteName: brandingName,
       });
+      await saveSettingsToFirestore(saved);
       showToast('Branding updated!');
       onRefreshData();
       syncAdminVaultFromServer();
@@ -860,6 +1000,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const persistSettings = async (nextSettings: AdminSettings, successMessage = 'Settings saved successfully!') => {
     try {
       const saved = await api.updateSettings(nextSettings);
+      await saveSettingsToFirestore(saved);
       setSettingsForm(saved);
       showToast(successMessage);
       onRefreshData();
@@ -950,6 +1091,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsRestoringBackup(true);
     try {
       await api.restoreAdminBackup(snapshotToRestore);
+      await syncFullStorefrontToFirestore(snapshotToRestore);
       if (snapshotToRestore.settings) {
         setSettingsForm(snapshotToRestore.settings);
       }
@@ -1333,6 +1475,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 max-w-5xl">
+          {/* Cloud Firestore Sync Banner */}
+          <div
+            className={`p-3 rounded-xl border text-xs flex flex-wrap items-center justify-between gap-2.5 ${
+              isCloudConnected
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50 border-amber-300 text-amber-950'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {isCloudConnected ? (
+                <Cloud className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <CloudOff className="w-4 h-4 text-amber-600 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <div className="font-extrabold">
+                  {isCloudConnected
+                    ? 'Cloud Database Connected (Firestore Active)'
+                    : 'Cloud Database Not Yet Connected'}
+                </div>
+                <div className="text-[11px] opacity-85">
+                  {isCloudConnected
+                    ? 'All saved products, banners, payment numbers, contacts & services sync permanently across restarts.'
+                    : 'Click Connect Cloud Database using obbyitmasters@gmail.com so changes never reset after server sleep or updates.'}
+                </div>
+              </div>
+            </div>
+            {!isCloudConnected && (
+              <button
+                type="button"
+                disabled={isConnectingCloud}
+                onClick={handleConnectCloudDatabase}
+                className="px-3.5 py-1.5 bg-[#1565C0] hover:bg-[#0d47a1] text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-60 shrink-0"
+              >
+                {isConnectingCloud ? 'Connecting...' : 'Connect Cloud Database'}
+              </button>
+            )}
+          </div>
+
           {toastMsg && (
             <div
               className={`p-3 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs ${

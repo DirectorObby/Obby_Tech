@@ -1,0 +1,559 @@
+{
+  "entities": {
+    "StoreSettings": {
+      "title": "StoreSettings",
+      "description": "Public storefront configuration, branding, contact info, delivery fees, services banner, and payment numbers managed by admin.",
+      "type": "object",
+      "properties": {
+        "websiteLogo": {
+          "type": "string",
+          "description": "Logo image URL or compact data URI",
+          "maxLength": 350000
+        },
+        "websiteName": {
+          "type": "string",
+          "description": "Store display name",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "paymentSettings": {
+          "type": "object",
+          "description": "Enabled mobile money and bank payment accounts"
+        },
+        "contactSettings": {
+          "type": "object",
+          "description": "Public business phone, WhatsApp, email, social media, and about text"
+        },
+        "deliverySettings": {
+          "type": "object",
+          "description": "Dar/Dodoma and regional transport fee settings"
+        },
+        "servicesBanner": {
+          "type": "object",
+          "description": "Home page Services 16:9 banner configuration"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp"
+        }
+      },
+      "required": [
+        "websiteName",
+        "paymentSettings",
+        "contactSettings",
+        "deliverySettings",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Store catalog product item.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Phones", "PC & Laptops", "CCTV", "Accessories", "Services"]
+        },
+        "price": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "specifications": {
+          "type": "array",
+          "description": "Up to 25 product specification strings"
+        },
+        "stock": {
+          "type": "number"
+        },
+        "availability": {
+          "type": "string",
+          "enum": ["IN_STOCK", "OUT_OF_STOCK"]
+        },
+        "condition": {
+          "type": "string",
+          "enum": ["Brand New", "Refurbished", "Used"]
+        },
+        "images": {
+          "type": "array",
+          "description": "Up to 6 image URLs or compact image strings"
+        },
+        "primaryImage": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "location": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "price",
+        "stock",
+        "availability",
+        "condition",
+        "images",
+        "primaryImage",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Storefront category metadata.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "enum": ["Phones", "PC & Laptops", "CCTV", "Accessories", "Services"]
+        },
+        "icon": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "iconType": {
+          "type": "string",
+          "enum": ["emoji", "lucide", "image"]
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "imageUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "icon", "description", "imageUrl", "createdAt", "updatedAt"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Professional technical or creative service offered by Obby Tech.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "iconName": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "requiresDeviceDetails": {
+          "type": "boolean"
+        },
+        "coverImage": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "showcaseItems": {
+          "type": "array",
+          "description": "Up to 15 showcase packages"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "title",
+        "description",
+        "iconName",
+        "requiresDeviceDetails",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PromoBanner": {
+      "title": "PromoBanner",
+      "description": "Homepage 16:9 promotional banner slide.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "image": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 450000
+        },
+        "kickerEn": { "type": "string", "maxLength": 120 },
+        "kickerSw": { "type": "string", "maxLength": 120 },
+        "titleEn": { "type": "string", "maxLength": 160 },
+        "titleSw": { "type": "string", "maxLength": 160 },
+        "subtitleEn": { "type": "string", "maxLength": 400 },
+        "subtitleSw": { "type": "string", "maxLength": 400 },
+        "ctaEn": { "type": "string", "maxLength": 80 },
+        "ctaSw": { "type": "string", "maxLength": 80 },
+        "targetCategory": {
+          "type": "string",
+          "enum": ["All", "Phones", "PC & Laptops", "CCTV", "Accessories", "Services"]
+        },
+        "enabled": { "type": "boolean" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "image", "targetCategory", "enabled", "order", "createdAt", "updatedAt"]
+    },
+    "AIInstruction": {
+      "title": "AIInstruction",
+      "description": "Custom admin instruction rule for Obby Ai assistant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "instruction": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "enabled": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "instruction", "enabled", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private customer or admin profile containing PII (restricted to owner and admin).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "role": { "type": "string", "enum": ["customer", "admin"] },
+        "photo": { "type": "string", "maxLength": 350000 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "region": { "type": "string", "maxLength": 100 },
+        "street": { "type": "string", "maxLength": 200 },
+        "address": { "type": "string", "maxLength": 300 },
+        "authProvider": { "type": "string", "enum": ["google", "facebook", "email"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "fullName", "email", "role", "authProvider", "createdAt", "updatedAt"]
+    },
+    "UserCart": {
+      "title": "UserCart",
+      "description": "Private persistent shopping cart bound to userId.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "items": {
+          "type": "array",
+          "description": "Bounded cart items list (max 50)"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "createdAt", "updatedAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase order with payment and delivery tracking.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerEmail": { "type": "string", "maxLength": 200 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "phone": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "region": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "street": { "type": "string", "maxLength": 250 },
+        "items": { "type": "array", "description": "Ordered items (max 50)" },
+        "subtotal": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "total": { "type": "number" },
+        "paymentMethod": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "paymentNumber": { "type": "string", "maxLength": 80 },
+        "paymentStatus": { "type": "string", "enum": ["PENDING", "PAID"] },
+        "deliveryStatus": {
+          "type": "string",
+          "enum": ["PENDING", "NOT_SHIPPED", "SHIPPED", "UMESAFIRISHWA"]
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "customerName",
+        "phone",
+        "region",
+        "items",
+        "subtotal",
+        "deliveryFee",
+        "total",
+        "paymentMethod",
+        "paymentStatus",
+        "deliveryStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ServiceBooking": {
+      "title": "ServiceBooking",
+      "description": "Customer service booking request.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerEmail": { "type": "string", "maxLength": 200 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "phone": { "type": "string", "minLength": 4, "maxLength": 40 },
+        "serviceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "serviceName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "bookingDate": { "type": "string", "minLength": 4, "maxLength": 30 },
+        "bookingTime": { "type": "string", "minLength": 2, "maxLength": 30 },
+        "deviceDetails": { "type": "string", "maxLength": 400 },
+        "problemDescription": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
+        },
+        "adminNotes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "customerName",
+        "phone",
+        "serviceId",
+        "serviceName",
+        "bookingDate",
+        "bookingTime",
+        "problemDescription",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Order or booking notification for a specific customer or admin.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "userEmail": { "type": "string", "maxLength": 200 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "type": {
+          "type": "string",
+          "enum": [
+            "order_received",
+            "payment_confirmed",
+            "order_shipped",
+            "new_order_admin",
+            "booking_received",
+            "booking_updated",
+            "new_booking_admin"
+          ]
+        },
+        "read": { "type": "boolean" },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "bookingId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt", "updatedAt"]
+    },
+    "AdminRegistry": {
+      "title": "AdminRegistry",
+      "description": "Authorized admin user record keyed by Firebase UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": { "type": "string", "minLength": 3, "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "ConnectionCheck": {
+      "title": "ConnectionCheck",
+      "description": "Startup Firestore connection check document.",
+      "type": "object",
+      "properties": {
+        "ok": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/StoreSettings" },
+      "description": "Storefront global configuration document (settings/store)."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Publicly readable, admin-managed product catalog."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Publicly readable, admin-managed product & service categories."
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Publicly readable, admin-managed services & showcase packages."
+    },
+    "/banners/{bannerId}": {
+      "schema": { "$ref": "#/entities/PromoBanner" },
+      "description": "Publicly readable, admin-managed 16:9 home banners."
+    },
+    "/ai_instructions/{instructionId}": {
+      "schema": { "$ref": "#/entities/AIInstruction" },
+      "description": "Admin-only custom instructions for Obby Ai."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private customer/admin account profiles isolated to owner and admin."
+    },
+    "/carts/{userId}": {
+      "schema": { "$ref": "#/entities/UserCart" },
+      "description": "Private per-user persistent shopping cart."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders readable by owner and admin."
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/ServiceBooking" },
+      "description": "Customer service bookings readable by owner and admin."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Per-user and admin notifications."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminRegistry" },
+      "description": "Trusted admin UID allowlist matching obbyitmasters@gmail.com."
+    },
+    "/test/{docId}": {
+      "schema": { "$ref": "#/entities/ConnectionCheck" },
+      "description": "Startup Firestore server connectivity check."
+    }
+  }
+}
