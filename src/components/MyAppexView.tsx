@@ -18,6 +18,7 @@ import {
 import { AdminSettings, CustomerProfile } from '../types';
 import { AuthModal } from './AuthModal';
 import { api, isOfficialAdminEmail } from '../services/api';
+import { upsertUserProfileInFirestore } from '../lib/firestoreStore';
 import { OBBY_SOCIAL_LINKS, ObbyTechWordmark } from './ObbyTechBrand';
 import { uploadImageFile } from '../utils/imageUpload';
 
@@ -444,6 +445,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
         street: formData.street,
         photo: formData.photo ?? '',
       });
+      upsertUserProfileInFirestore(res.user).catch(() => {});
       onSaveProfile(res.user);
       setFormData(res.user);
       setProfileSavedMsg('Profile saved securely!');
@@ -468,6 +470,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
         quality: 0.88,
       });
       const res = await api.updateProfile({ photo: imageUrl });
+      upsertUserProfileInFirestore(res.user).catch(() => {});
       onSaveProfile(res.user);
       setFormData(res.user);
       setProfileSavedMsg('Profile photo updated!');
@@ -484,6 +487,7 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
     setIsUploadingPhoto(true);
     try {
       const res = await api.updateProfile({ photo: '' });
+      upsertUserProfileInFirestore(res.user).catch(() => {});
       onSaveProfile(res.user);
       setFormData(res.user);
       setProfileSavedMsg('Profile photo removed.');

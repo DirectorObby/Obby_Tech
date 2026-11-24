@@ -297,7 +297,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       await syncAdminVaultFromServer();
       showToast('Cloud Firestore connected! All admin changes are now permanently saved.');
     } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
+      if (err?.code === 'auth/unauthorized-domain' || String(err?.message || '').includes('unauthorized-domain')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'obby-tech.onrender.com';
+        setToastMsg({
+          type: 'error',
+          text: `Add "${host}" in Firebase Console -> Authentication -> Settings -> Authorized domains, then click Connect Cloud Database again.`,
+        });
+      } else if (err?.code !== 'auth/popup-closed-by-user') {
         showToast(err?.message || 'Could not connect Cloud Database.', 'error');
       }
     } finally {

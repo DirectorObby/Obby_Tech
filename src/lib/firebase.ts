@@ -25,6 +25,14 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
+let googlePopupActive = false;
+export function setGooglePopupActive(active: boolean) {
+  googlePopupActive = active;
+}
+export function isGooglePopupActive(): boolean {
+  return googlePopupActive;
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',

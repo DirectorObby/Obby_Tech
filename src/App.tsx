@@ -29,6 +29,7 @@ import {
   auth,
   firebaseSignOut,
   getRedirectResult,
+  isGooglePopupActive,
   onAuthStateChanged,
 } from './lib/firebase';
 import {
@@ -38,6 +39,7 @@ import {
   fetchNotificationsFromFirestore,
   fetchOrdersFromFirestore,
   fetchStorefrontFromFirestore,
+  fetchUserProfileFromFirestore,
   isFirebaseUserVerified,
   markNotificationReadInFirestore,
   saveCartToFirestore,
@@ -316,11 +318,23 @@ export default function App() {
     restoreSession();
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser && fbUser.email && !getAuthToken()) {
+      if (fbUser && fbUser.email && !getAuthToken() && !isGooglePopupActive()) {
         try {
           const idToken = await fbUser.getIdToken();
           const authRes = await api.googleAuth({ idToken });
-          setAuthUser(authRes.user);
+          const cloudProfile = await fetchUserProfileFromFirestore().catch(() => null);
+          const merged: CustomerProfile = cloudProfile
+            ? {
+                ...authRes.user,
+                fullName: cloudProfile.fullName || authRes.user.fullName,
+                phone: cloudProfile.phone || authRes.user.phone || '',
+                region: cloudProfile.region || authRes.user.region || 'Dodoma',
+                street: cloudProfile.street || authRes.user.street || '',
+                address: cloudProfile.address || authRes.user.address || '',
+                photo: cloudProfile.photo || authRes.user.photo || '',
+              }
+            : authRes.user;
+          setAuthUser(merged);
           setAdminUnlocked(Boolean(authRes.adminUnlocked));
         } catch (err) {
           console.warn('Firebase auth sync skipped:', err);

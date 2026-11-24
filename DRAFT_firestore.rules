@@ -478,7 +478,7 @@ service cloud.firestore {
 
     // Customer Orders (Owner & Admin Isolation + Terminal State Lock)
     match /orders/{orderId} {
-      allow get: if isValidId(orderId) && isVerifiedUser() && (existing().customerId == request.auth.uid || isAdmin());
+      allow get: if isValidId(orderId) && isVerifiedUser() && (resource == null || existing().customerId == request.auth.uid || isAdmin());
       allow list: if isVerifiedUser() && (resource.data.customerId == request.auth.uid || isAdminEmail());
       allow create: if isVerifiedUser()
         && isValidId(orderId)
@@ -515,7 +515,7 @@ service cloud.firestore {
 
     // Service Bookings (Master Gate + Terminal State Lock)
     match /bookings/{bookingId} {
-      allow get: if isValidId(bookingId) && isVerifiedUser() && (existing().customerId == request.auth.uid || isAdmin());
+      allow get: if isValidId(bookingId) && isVerifiedUser() && (resource == null || existing().customerId == request.auth.uid || isAdmin());
       allow list: if isVerifiedUser() && (resource.data.customerId == request.auth.uid || isAdminEmail());
       allow create: if isVerifiedUser()
         && isValidId(bookingId)
@@ -545,7 +545,7 @@ service cloud.firestore {
 
     // Notifications (Owner & Admin Only)
     match /notifications/{notificationId} {
-      allow get: if isValidId(notificationId) && isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin());
+      allow get: if isValidId(notificationId) && isVerifiedUser() && (resource == null || existing().userId == request.auth.uid || isAdmin());
       allow list: if isVerifiedUser() && (
         resource.data.userId == request.auth.uid || isAdminEmail()
       );

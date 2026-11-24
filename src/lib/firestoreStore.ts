@@ -616,6 +616,30 @@ export async function upsertUserProfileInFirestore(profile: CustomerProfile): Pr
   }
 }
 
+export async function fetchUserProfileFromFirestore(): Promise<CustomerProfile | null> {
+  if (!isFirebaseUserVerified() || !auth.currentUser) return null;
+  const uid = sanitizeDocId(auth.currentUser.uid, 'usr');
+  try {
+    const snap = await getDoc(doc(db, 'users', uid));
+    if (!snap.exists()) return null;
+    const d = snap.data();
+    return {
+      id: d.id || uid,
+      fullName: d.fullName || auth.currentUser.displayName || '',
+      email: d.email || auth.currentUser.email || '',
+      role: d.role || 'customer',
+      photo: d.photo || '',
+      phone: d.phone || '',
+      region: d.region || 'Dodoma',
+      street: d.street || '',
+      address: d.address || '',
+      authProvider: d.authProvider || 'google',
+    };
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, `users/${uid}`);
+  }
+}
+
 export async function fetchCartFromFirestore(): Promise<OrderItem[] | null> {
   if (!isFirebaseUserVerified() || !auth.currentUser) return null;
   const uid = sanitizeDocId(auth.currentUser.uid, 'usr');
@@ -790,6 +814,7 @@ export async function upsertBookingInFirestore(booking: ServiceBooking): Promise
   if (!isFirebaseUserVerified() || !auth.currentUser) return;
   const id = sanitizeDocId(booking.id, 'BK');
   const uid = sanitizeDocId(auth.currentUser.uid, 'usr');
+  const serviceId = sanitizeDocId(booking.serviceId, 'srv');
   const docRef = doc(db, 'bookings', id);
 
   try {
@@ -805,13 +830,18 @@ export async function upsertBookingInFirestore(booking: ServiceBooking): Promise
         });
       }
     } else {
+      // Master gate in firestore.rules requires services/{serviceId} to exist
+      const srvSnap = await getDoc(doc(db, 'services', serviceId)).catch(() => null);
+      if (!srvSnap || !srvSnap.exists()) {
+        return;
+      }
       await setDoc(docRef, {
         id,
         customerId: uid,
         customerEmail: clampStr(booking.customerEmail || auth.currentUser.email || '', 200),
         customerName: clampStr(booking.customerName, 160, 'Customer'),
         phone: clampStr(booking.phone, 40, '0000'),
-        serviceId: sanitizeDocId(booking.serviceId, 'srv'),
+        serviceId,
         serviceName: clampStr(booking.serviceName, 160, 'Service'),
         bookingDate: clampStr(booking.bookingDate, 30, '2026-01-01'),
         bookingTime: clampStr(booking.bookingTime, 30, '09:00'),

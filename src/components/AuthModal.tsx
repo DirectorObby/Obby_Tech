@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, AlertCircle, X, Shield, Eye, EyeOff, Loader2, Check } from 'lucide-react';
-import { api } from '../services/api';
+import { api, setAuthToken } from '../services/api';
+import {
+  auth,
+  googleProvider,
+  setGooglePopupActive,
+  signInWithPopup,
+} from '../lib/firebase';
+import {
+  fetchUserProfileFromFirestore,
+  upsertUserProfileInFirestore,
+} from '../lib/firestoreStore';
 import { CustomerProfile } from '../types';
 import { ObbyTechLogoEmblem, ObbyTechWordmark } from './ObbyTechBrand';
 
@@ -37,9 +47,57 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Continue with Google — purely decorative placeholder (no action on click)
-  const handleDecorativeGoogleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
+  // Continue with Google — Real Firebase Auth Sign-In + Cloud Firestore Profile Sync
+  const handleGoogleAuth = async () => {
+    setErrorMsg('');
+    setInfoMsg('');
+    setIsLoading(true);
+    setGooglePopupActive(true);
+
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const idToken = await cred.user.getIdToken();
+      const authRes = await api.googleAuth({ idToken });
+      setAuthToken(authRes.token, rememberMe);
+
+      const existingCloudProfile = await fetchUserProfileFromFirestore().catch(() => null);
+      const mergedProfile: CustomerProfile = existingCloudProfile
+        ? {
+            ...authRes.user,
+            fullName: existingCloudProfile.fullName || authRes.user.fullName,
+            phone: existingCloudProfile.phone || authRes.user.phone || '',
+            region: existingCloudProfile.region || authRes.user.region || 'Dodoma',
+            street: existingCloudProfile.street || authRes.user.street || '',
+            address: existingCloudProfile.address || authRes.user.address || '',
+            photo: existingCloudProfile.photo || authRes.user.photo || '',
+          }
+        : authRes.user;
+
+      if (!existingCloudProfile) {
+        await upsertUserProfileInFirestore(mergedProfile).catch(() => {});
+      }
+
+      onSuccess(mergedProfile, authRes.token, rememberMe);
+    } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user') {
+        // User dismissed Google popup
+      } else if (
+        err?.code === 'auth/unauthorized-domain' ||
+        String(err?.message || '').includes('unauthorized-domain')
+      ) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        setErrorMsg(
+          `Domain "${host}" is not yet authorized in Firebase Console -> Authentication -> Settings -> Authorized domains.`
+        );
+      } else if (err?.code === 'auth/popup-blocked') {
+        setErrorMsg('Sign-in popup was blocked by your browser. Please allow popups and try again.');
+      } else {
+        setErrorMsg(err?.message || 'Google sign-in failed. Please try again.');
+      }
+    } finally {
+      setGooglePopupActive(false);
+      setIsLoading(false);
+    }
   };
 
   // Facebook Auth Click Handler
@@ -128,11 +186,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       {/* Auth Provider Buttons */}
       <div className="space-y-2.5">
-        {/* Google Sign In — Decorative Only (no action on click) */}
+        {/* Google Sign In — Real Firebase Auth */}
         <button
           type="button"
-          onClick={handleDecorativeGoogleClick}
-          className="w-full bg-white border border-slate-300 text-slate-800 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-3 shadow-2xs cursor-default"
+          onClick={handleGoogleAuth}
+          disabled={isLoading}
+          className="w-full bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-3 transition-all shadow-2xs active:scale-98 disabled:opacity-50 cursor-pointer"
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
             <path
