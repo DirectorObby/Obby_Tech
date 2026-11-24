@@ -293,7 +293,8 @@ export default function App() {
           const me = await api.getCurrentUser();
           if (me && me.user) {
             setAuthUser(me.user);
-            setAdminUnlocked(Boolean(me.adminUnlocked));
+            const isAdmin = me.user.role === 'admin' || isOfficialAdminEmail(me.user.email);
+            setAdminUnlocked(Boolean(me.adminUnlocked) || isAdmin);
             return;
           }
         } catch {
@@ -307,7 +308,8 @@ export default function App() {
           const idToken = await redirectRes.user.getIdToken();
           const authRes = await api.googleAuth({ idToken });
           setAuthUser(authRes.user);
-          setAdminUnlocked(Boolean(authRes.adminUnlocked));
+          const isAdmin = authRes.user.role === 'admin' || isOfficialAdminEmail(authRes.user.email);
+          setAdminUnlocked(Boolean(authRes.adminUnlocked) || isAdmin);
           setActiveTab('myappex');
         }
       } catch (e) {
@@ -335,7 +337,8 @@ export default function App() {
               }
             : authRes.user;
           setAuthUser(merged);
-          setAdminUnlocked(Boolean(authRes.adminUnlocked));
+          const isAdmin = merged.role === 'admin' || isOfficialAdminEmail(merged.email);
+          setAdminUnlocked(Boolean(authRes.adminUnlocked) || isAdmin);
         } catch (err) {
           console.warn('Firebase auth sync skipped:', err);
         }
@@ -520,7 +523,7 @@ export default function App() {
     setCartItems([]);
     setAuthUser(user);
     const isAdmin = user.role === 'admin' || isOfficialAdminEmail(user.email);
-    setAdminUnlocked(isAdmin && user.authProvider === 'email');
+    setAdminUnlocked(isAdmin);
     setAuthModalState({ isOpen: false });
 
     if (pendingTab) {
@@ -1045,7 +1048,7 @@ export default function App() {
             onSaveProfile={(prof) => {
               setAuthUser(prof);
               const isAdmin = prof.role === 'admin' || isOfficialAdminEmail(prof.email);
-              if (isAdmin && prof.authProvider === 'email') {
+              if (isAdmin) {
                 setAdminUnlocked(true);
               }
             }}

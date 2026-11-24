@@ -11,7 +11,6 @@ import {
   Trash2,
   Edit2,
   AlertCircle,
-  LogOut,
   RefreshCw,
   Wrench,
   Sparkles,
@@ -22,9 +21,6 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
-  Lock,
-  Eye,
-  EyeOff,
   Download,
   Upload,
   Cloud,
@@ -139,8 +135,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   categories: propCategories,
   settings,
   authUser,
-  initialAdminUnlocked = false,
-  onAdminUnlocked,
+  initialAdminUnlocked: _initialAdminUnlocked = true,
+  onAdminUnlocked: _onAdminUnlocked,
   onPasswordUpdated,
   onRefreshData,
   onClose,
@@ -149,17 +145,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     authUser && (authUser.role === 'admin' || isOfficialAdminEmail(authUser.email))
   );
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    isVerifiedAdmin && initialAdminUnlocked
-  );
+  const isAuthenticated = isVerifiedAdmin;
   const [mustChangePassword, setMustChangePassword] = useState<boolean>(
-    Boolean(authUser?.mustChangePassword)
+    Boolean(authUser?.mustChangePassword && authUser?.authProvider !== 'google')
   );
 
-  const [passwordInput, setPasswordInput] = useState('');
-  const [showAdminLoginPass, setShowAdminLoginPass] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  useEffect(() => {
+    setMustChangePassword(Boolean(authUser?.mustChangePassword && authUser?.authProvider !== 'google'));
+  }, [authUser?.mustChangePassword, authUser?.authProvider]);
 
   // Admin-specific data fetched when unlocked
   const [adminOrders, setAdminOrders] = useState<Order[]>(propOrders);
@@ -474,37 +467,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       syncAdminVaultFromServer();
     } catch (err: any) {
       showToast(err.message || 'Failed to save Home Page Services Banner', 'error');
-    }
-  };
-
-  // Handle Admin Lock / Logout
-  const handleAdminLock = () => {
-    setIsAuthenticated(false);
-    setPasswordInput('');
-    setAuthError('');
-  };
-
-  // Handle Admin Unlock Login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordInput.trim()) {
-      setAuthError('Please enter the administrator password.');
-      return;
-    }
-    setIsLoggingIn(true);
-    try {
-      const res = await api.adminLogin(passwordInput);
-      const needsChange = Boolean(res.mustChangePassword);
-      setMustChangePassword(needsChange);
-      setIsAuthenticated(true);
-      setAuthError('');
-      setPasswordInput('');
-      onAdminUnlocked?.(needsChange);
-      onRefreshData();
-    } catch (err: any) {
-      setAuthError(err.message || 'Invalid administrator password.');
-    } finally {
-      setIsLoggingIn(false);
     }
   };
 
@@ -1216,74 +1178,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   }
 
-  // Admin Password Verification Screen
-  if (!isAuthenticated) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-        <div className="bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl relative space-y-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="text-center space-y-2 pt-2">
-            <div className="flex flex-col items-center gap-1.5">
-              <ObbyTechLogoEmblem customLogoUrl={settings.websiteLogo} size="md" />
-              <ObbyTechWordmark variant="light" size="md" />
-            </div>
-            <div className="text-xs font-black text-slate-900">
-              OBBY TECH Administrator Access
-            </div>
-            <div className="text-[11px] text-slate-500 font-medium">
-              Authorized Account: <span className="text-slate-900 font-bold">{authUser?.email}</span>
-            </div>
-          </div>
-
-          {authError && (
-            <div className="p-2.5 bg-red-50 text-red-700 text-xs rounded-xl flex items-center gap-2 font-medium">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" /> {authError}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Enter Admin Password</label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type={showAdminLoginPass ? 'text' : 'password'}
-                  required
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Enter administrator password"
-                  className="w-full bg-slate-50 border border-slate-200 text-xs pl-9 pr-10 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAdminLoginPass((p) => !p)}
-                  className="absolute right-3 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
-                  aria-label="Toggle password visibility"
-                >
-                  {showAdminLoginPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={isLoggingIn}
-              className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-xs hover:bg-slate-800 transition-colors shadow-md cursor-pointer disabled:opacity-60"
-            >
-              {isLoggingIn ? 'VERIFYING...' : 'LOGIN TO ADMIN DASHBOARD'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   // Mandatory Temporary Password Replacement Gate
   if (mustChangePassword) {
     return (
@@ -1409,14 +1303,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             title="Refresh Data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingAdminData ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            type="button"
-            onClick={handleAdminLock}
-            className="p-1.5 hover:bg-slate-800 rounded-lg text-red-400 cursor-pointer"
-            title="Lock Admin Dashboard"
-          >
-            <LogOut className="w-4 h-4" />
           </button>
           <button
             type="button"

@@ -63,6 +63,7 @@ interface SessionRecord {
   email: string;
   role: 'admin' | 'customer';
   adminUnlocked: boolean;
+  authMethod?: 'google' | 'email';
   expiresAt: number;
 }
 
@@ -490,7 +491,8 @@ function saveDatabase() {
 function createSession(
   user: UserAccount,
   adminUnlocked: boolean,
-  rememberMe: boolean = true
+  rememberMe: boolean = true,
+  authMethod: 'google' | 'email' = 'email'
 ): SessionRecord {
   const token = crypto.randomBytes(32).toString('hex');
   const ttl = rememberMe ? REMEMBERED_SESSION_TTL_MS : SESSION_TTL_MS;
@@ -500,6 +502,7 @@ function createSession(
     email: user.email.toLowerCase(),
     role: isOfficialAdmin(user.email) ? 'admin' : 'customer',
     adminUnlocked: isOfficialAdmin(user.email) && adminUnlocked,
+    authMethod,
     expiresAt: Date.now() + ttl,
   };
   db.sessions = db.sessions.filter((s) => s.expiresAt > Date.now());
@@ -556,15 +559,16 @@ function requireAdmin(req: AuthedRequest, res: express.Response, next: express.N
   if (!isOfficialAdmin(ctx.user.email)) {
     return res.status(403).json({ error: 'Access denied: Administrator permission required.' });
   }
-  if (!ctx.session.adminUnlocked) {
-    return res.status(403).json({ error: 'Admin password verification required.' });
-  }
+  ctx.session.adminUnlocked = true;
   req.authSession = ctx.session;
   req.authUser = ctx.user;
   next();
 }
 
 function requireAdminPasswordUpdated(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
+  if (req.authSession?.authMethod === 'google' || req.authUser?.authProvider === 'google') {
+    return next();
+  }
   if (db.adminMustChangePassword) {
     return res.status(403).json({
       error: 'Please change your temporary initial administrator password first.',
@@ -1359,14 +1363,18 @@ async function startServer() {
       db.users.push(user);
     }
 
-    const session = createSession(user, false);
+    const session = createSession(user, isAdmin, true, 'google');
+    const safeUser = {
+      ...sanitizeUser(user),
+      mustChangePassword: false,
+    };
     res.json({
       success: true,
-      user: sanitizeUser(user),
+      user: safeUser,
       token: session.token,
       isAdmin,
-      adminUnlocked: false,
-      mustChangePassword: isAdmin ? db.adminMustChangePassword : false,
+      adminUnlocked: isAdmin,
+      mustChangePassword: false,
     });
   });
 
@@ -1449,7 +1457,7 @@ async function startServer() {
     user.mustChangePassword = isAdmin ? db.adminMustChangePassword : false;
     user.updatedAt = new Date().toISOString();
 
-    const session = createSession(user, isAdmin, rememberMe !== false);
+    const session = createSession(user, isAdmin, rememberMe !== false, 'email');
     res.json({
       success: true,
       user: sanitizeUser(user),
@@ -1494,12 +1502,17 @@ async function startServer() {
   app.get('/api/auth/me', requireAuth, (req: AuthedRequest, res) => {
     const user = req.authUser!;
     const isAdmin = isOfficialAdmin(user.email);
+    const isGoogleSession = req.authSession?.authMethod === 'google' || user.authProvider === 'google';
+    const needsPassChange = isAdmin && !isGoogleSession ? db.adminMustChangePassword : false;
     res.json({
       success: true,
-      user: sanitizeUser(user),
+      user: {
+        ...sanitizeUser(user),
+        mustChangePassword: needsPassChange,
+      },
       isAdmin,
-      adminUnlocked: Boolean(req.authSession?.adminUnlocked),
-      mustChangePassword: isAdmin ? db.adminMustChangePassword : false,
+      adminUnlocked: isAdmin,
+      mustChangePassword: needsPassChange,
     });
   });
 
