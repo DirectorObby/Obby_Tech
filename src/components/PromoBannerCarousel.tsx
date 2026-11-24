@@ -65,15 +65,15 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
   };
 
   return (
-    <section className="bg-[#F2F6FC] sm:px-3 sm:pt-3 pb-1">
+    <section className="bg-[#F2F6FC] px-3 pt-3 pb-1">
       <div
-        className="relative max-w-4xl mx-auto sm:rounded-xl overflow-hidden bg-white shadow-xs group aspect-[2/1] sm:aspect-[21/9]"
+        className="relative max-w-4xl mx-auto rounded-xl overflow-hidden bg-white shadow-xs group aspect-video"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Sliding Track — Clean, Uncluttered Banner With Crisp Original Photo & Action Link */}
+        {/* Sliding Track — Clean 16:9 Banner With Crisp Original Photo & Action Link */}
         <div
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
@@ -96,7 +96,7 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                     onSelectCategory(slide.targetCategory);
                   }
                 }}
-                className="w-full h-full shrink-0 relative aspect-[2/1] sm:aspect-[21/9] cursor-pointer bg-white"
+                className="w-full h-full shrink-0 relative aspect-video cursor-pointer bg-white"
               >
                 <img
                   src={slide.image}

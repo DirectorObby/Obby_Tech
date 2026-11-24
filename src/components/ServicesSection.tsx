@@ -94,7 +94,7 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
             onOpenServices();
           }
         }}
-        className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white shadow-sm cursor-pointer group aspect-[2/1] sm:aspect-[21/9]"
+        className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white shadow-sm cursor-pointer group aspect-video"
       >
         {bgImage && (
           <img

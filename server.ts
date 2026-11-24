@@ -360,25 +360,20 @@ function loadDatabase(): DatabaseState {
     needsSave = true;
   }
 
-  const existingServicesList: ServiceItem[] =
-    Array.isArray(loaded.services) && loaded.services.length > 0 ? [...loaded.services] : [];
-  for (const defSrv of INITIAL_SERVICES) {
-    if (!existingServicesList.some((s) => s.id === defSrv.id || s.slug === defSrv.slug)) {
-      existingServicesList.push(defSrv);
-      needsSave = true;
-    }
+  const existingServicesList: ServiceItem[] = Array.isArray(loaded.services)
+    ? [...loaded.services]
+    : [...INITIAL_SERVICES];
+  if (!Array.isArray(loaded.services)) {
+    needsSave = true;
   }
-  const mergedServices: ServiceItem[] = (
-    existingServicesList.length > 0 ? existingServicesList : INITIAL_SERVICES
-  ).map((srv) => {
+  const mergedServices: ServiceItem[] = existingServicesList.map((srv) => {
     const defSrv = INITIAL_SERVICES.find((d) => d.id === srv.id || d.slug === srv.slug);
     return {
       ...srv,
-      coverImage: srv.coverImage || defSrv?.coverImage || '',
-      showcaseItems:
-        Array.isArray(srv.showcaseItems) && srv.showcaseItems.length > 0
-          ? srv.showcaseItems
-          : defSrv?.showcaseItems || [],
+      coverImage: srv.coverImage !== undefined ? srv.coverImage : (defSrv?.coverImage || ''),
+      showcaseItems: Array.isArray(srv.showcaseItems)
+        ? srv.showcaseItems
+        : (defSrv?.showcaseItems || []),
     };
   });
 
@@ -391,7 +386,7 @@ function loadDatabase(): DatabaseState {
   };
 
   const migratedProducts: Product[] = (
-    Array.isArray(loaded.products) && loaded.products.length > 0 ? loaded.products : INITIAL_PRODUCTS
+    Array.isArray(loaded.products) ? loaded.products : INITIAL_PRODUCTS
   ).map((p) => {
     const nextImages = Array.isArray(p.images)
       ? p.images.map((img) => migrateImg(img, 'prod'))
@@ -411,7 +406,7 @@ function loadDatabase(): DatabaseState {
   }));
 
   const migratedBanners: PromoBanner[] = (
-    Array.isArray(loaded.banners) && loaded.banners.length > 0 ? loaded.banners : INITIAL_BANNERS
+    Array.isArray(loaded.banners) ? loaded.banners : INITIAL_BANNERS
   ).map((b) => ({
     ...b,
     image: migrateImg(b.image, 'banner'),
@@ -449,7 +444,7 @@ function loadDatabase(): DatabaseState {
     banners: migratedBanners,
     bookings: Array.isArray(loaded.bookings) ? loaded.bookings : [],
     aiInstructions:
-      Array.isArray(loaded.aiInstructions) && loaded.aiInstructions.length > 0
+      Array.isArray(loaded.aiInstructions)
         ? loaded.aiInstructions
         : INITIAL_AI_INSTRUCTIONS,
     orders: Array.isArray(loaded.orders) ? loaded.orders : [],
@@ -466,7 +461,9 @@ function loadDatabase(): DatabaseState {
 
   if (needsSave || !fs.existsSync(DB_PATH)) {
     try {
-      fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), 'utf-8');
+      const tmpPath = `${DB_PATH}.tmp`;
+      fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2), 'utf-8');
+      fs.renameSync(tmpPath, DB_PATH);
     } catch (err) {
       console.error('Failed to save migrated database:', err);
     }
@@ -480,7 +477,9 @@ let db: DatabaseState = loadDatabase();
 function saveDatabase() {
   try {
     db.sessions = db.sessions.filter((s) => s.expiresAt > Date.now());
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf-8');
+    const tmpPath = `${DB_PATH}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(db, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, DB_PATH);
   } catch (err) {
     console.error('Failed to save database to disk:', err);
   }

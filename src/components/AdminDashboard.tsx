@@ -155,10 +155,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setCategories(propCategories);
   }, [propCategories]);
 
+  const hasInitializedSettingsForm = React.useRef(false);
   useEffect(() => {
-    setSettingsForm(settings);
-    setNewLogo(settings.websiteLogo || '');
-    setBrandingName(settings.websiteName || 'OBBY TECH');
+    if (!hasInitializedSettingsForm.current) {
+      setSettingsForm(settings);
+      setNewLogo(settings.websiteLogo || '');
+      setBrandingName(settings.websiteName || 'OBBY TECH');
+      hasInitializedSettingsForm.current = true;
+    }
   }, [settings]);
 
   const loadAdminData = async () => {
@@ -1898,8 +1902,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 </div>
 
-                {/* Live Mini Preview */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white rounded-xl aspect-[21/9] p-4 flex flex-col justify-end">
+                {/* Live Mini Preview (16:9) */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white rounded-xl aspect-video max-w-md p-4 flex flex-col justify-end">
                   {servicesBannerForm.imageUrl && (
                     <img
                       src={servicesBannerForm.imageUrl}
