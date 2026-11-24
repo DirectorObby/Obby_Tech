@@ -47,7 +47,7 @@ import { api, isOfficialAdminEmail } from '../services/api';
 import { renderCategoryLucideIcon } from './RecommendedCategories';
 import { renderServiceIcon } from './ServicesSection';
 import { ObbyTechLogoEmblem, ObbyTechWordmark } from './ObbyTechBrand';
-import { readImageFileAsDataUrl } from '../utils/imageUpload';
+import { uploadImageFile } from '../utils/imageUpload';
 
 type AdminTab =
   | 'home'
@@ -249,11 +249,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [showAddPaymentForm, setShowAddPaymentForm] = useState(false);
 
   const defaultServicesBanner = {
-    kicker: 'OBBY TECH · TECHNICAL & CREATIVE STUDIO',
-    title: 'Professional Repairs, Graphic Design, Video & IT Solutions',
-    subtitle:
-      'Explore specialized service categories with real work samples, transparent prices, and instant appointment booking.',
-    ctaText: 'View Our Services',
+    kicker: '',
+    title: 'Obby Tech Services',
+    subtitle: '',
+    ctaText: 'View Services',
     imageUrl: '',
   };
 
@@ -277,8 +276,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file);
-      updateServicesBannerField('imageUrl', dataUrl);
+      const imageUrl = await uploadImageFile(file, { maxDimension: 1920, maxRawBytes: 1_500_000, quality: 0.92 });
+      updateServicesBannerField('imageUrl', imageUrl);
+      showToast('Banner image uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load selected image.', 'error');
     }
@@ -365,13 +365,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList) as File[];
     e.target.value = '';
+    let uploadedCount = 0;
     for (const file of files) {
       try {
-        const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1600 });
-        setProductImages((prev) => [...prev, dataUrl]);
+        const imageUrl = await uploadImageFile(file, { maxDimension: 1400, maxRawBytes: 900_000, quality: 0.88 });
+        setProductImages((prev) => [...prev, imageUrl]);
+        uploadedCount += 1;
       } catch (err: any) {
         showToast(err?.message || `Could not load ${file.name}.`, 'error');
       }
+    }
+    if (uploadedCount > 0) {
+      showToast(`${uploadedCount} product ${uploadedCount === 1 ? 'photo' : 'photos'} uploaded!`);
     }
   };
 
@@ -542,8 +547,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1600 });
-      handleUpdateShowcaseItem(itemId, { image: dataUrl });
+      const imageUrl = await uploadImageFile(file, { maxDimension: 1400, maxRawBytes: 900_000, quality: 0.88 });
+      handleUpdateShowcaseItem(itemId, { image: imageUrl });
+      showToast('Service photo uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load selected image.', 'error');
     }
@@ -590,8 +596,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file || !editingBanner) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 2048, maxRawBytes: 4_000_000, quality: 0.94 });
-      setEditingBanner((prev) => (prev ? { ...prev, image: dataUrl } : prev));
+      const imageUrl = await uploadImageFile(file, { maxDimension: 1920, maxRawBytes: 1_500_000, quality: 0.92 });
+      setEditingBanner((prev) => (prev ? { ...prev, image: imageUrl } : prev));
+      showToast('Banner photo uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load selected banner image.', 'error');
     }
@@ -661,16 +668,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file || !editingCategory) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 600, maxRawBytes: 1_000_000 });
+      const imageUrl = await uploadImageFile(file, { maxDimension: 600, maxRawBytes: 600_000 });
       setEditingCategory((prev) =>
         prev
           ? {
               ...prev,
-              icon: dataUrl,
+              icon: imageUrl,
               iconType: 'image',
             }
           : prev
       );
+      showToast('Category icon uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load icon image.', 'error');
     }
@@ -681,8 +689,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file || !editingCategory) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1200 });
-      setEditingCategory((prev) => (prev ? { ...prev, imageUrl: dataUrl } : prev));
+      const imageUrl = await uploadImageFile(file, { maxDimension: 1200, maxRawBytes: 800_000 });
+      setEditingCategory((prev) => (prev ? { ...prev, imageUrl } : prev));
+      showToast('Category image uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load category image.', 'error');
     }
@@ -781,8 +790,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.target.value = '';
     if (!file) return;
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, { maxDimension: 1024, maxRawBytes: 1_500_000 });
-      setNewLogo(dataUrl);
+      const imageUrl = await uploadImageFile(file, { maxDimension: 1024, maxRawBytes: 900_000 });
+      setNewLogo(imageUrl);
+      showToast('Website logo uploaded!');
     } catch (err: any) {
       showToast(err?.message || 'Unable to load logo image.', 'error');
     }
@@ -1889,32 +1899,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {/* Live Mini Preview */}
-                <div className="relative overflow-hidden bg-slate-950 text-white rounded-lg border border-slate-800 p-4">
+                <div className="relative overflow-hidden bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white rounded-xl aspect-[21/9] p-4 flex flex-col justify-end">
                   {servicesBannerForm.imageUrl && (
-                    <>
-                      <img
-                        src={servicesBannerForm.imageUrl}
-                        alt="Services banner preview"
-                        className="absolute inset-0 w-full h-full object-cover opacity-45"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/70 to-slate-950/40" />
-                    </>
+                    <img
+                      src={servicesBannerForm.imageUrl}
+                      alt="Services banner preview"
+                      className="absolute inset-0 w-full h-full object-cover object-center opacity-100"
+                    />
                   )}
-                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1 max-w-md">
-                      <div className="text-[9.5px] font-bold uppercase tracking-widest text-blue-400">
-                        {servicesBannerForm.kicker || defaultServicesBanner.kicker}
-                      </div>
-                      <div className="text-sm font-bold text-white leading-snug">
+                  <div className="relative z-10 space-y-2 max-w-[75%]">
+                    {(servicesBannerForm.title || defaultServicesBanner.title) && (
+                      <div className="text-sm sm:text-base font-black text-white leading-tight [text-shadow:0_2px_8px_rgba(12,8,38,0.75)]">
                         {servicesBannerForm.title || defaultServicesBanner.title}
                       </div>
-                      <p className="text-[11px] text-slate-300 line-clamp-2">
-                        {servicesBannerForm.subtitle || defaultServicesBanner.subtitle}
-                      </p>
+                    )}
+                    <div>
+                      <span className="inline-flex items-center gap-1 bg-white/95 text-[#0C0826] text-[11px] font-extrabold px-3.5 py-1 rounded-full shadow-sm">
+                        <span>{servicesBannerForm.ctaText || 'View Services'}</span>
+                        <span>&gt;&gt;</span>
+                      </span>
                     </div>
-                    <span className="inline-flex items-center bg-[#0B3B8C] text-white text-[11px] font-bold px-3.5 py-2 rounded-lg shrink-0 self-start sm:self-center">
-                      {servicesBannerForm.ctaText || 'View Our Services'} →
-                    </span>
                   </div>
                 </div>
 
@@ -2320,14 +2324,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onClick={() =>
                     setEditingBanner({
                       image: '',
-                      kickerEn: 'OBBY TECH · FEATURED',
-                      kickerSw: 'OBBY TECH · OFA MAALUM',
+                      kickerEn: '',
+                      kickerSw: '',
                       titleEn: '',
                       titleSw: '',
                       subtitleEn: '',
                       subtitleSw: '',
-                      ctaEn: 'Explore Now',
-                      ctaSw: 'Tazama Sasa',
+                      ctaEn: 'Shop Now',
+                      ctaSw: 'Nunua Sasa',
                       targetCategory: 'All',
                       enabled: true,
                     })
@@ -2666,13 +2670,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         onChange={handleCategoryIconUpload}
                         className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:text-xs file:font-bold file:text-slate-800 cursor-pointer"
                       />
-                      {editingCategory.icon && editingCategory.icon.startsWith('data:image') && (
-                        <img
-                          src={editingCategory.icon}
-                          alt="Icon preview"
-                          className="w-12 h-12 object-contain rounded-lg border bg-white p-1"
-                        />
-                      )}
+                      {editingCategory.icon &&
+                        (editingCategory.icon.startsWith('data:image') ||
+                          editingCategory.icon.startsWith('/uploads/') ||
+                          editingCategory.icon.startsWith('http')) && (
+                          <img
+                            src={editingCategory.icon}
+                            alt="Icon preview"
+                            className="w-12 h-12 object-contain rounded-lg border bg-white p-1"
+                          />
+                        )}
                     </div>
                   )}
 

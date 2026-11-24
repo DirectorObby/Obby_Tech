@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CategoryName, PromoBanner } from '../types';
 import { INITIAL_BANNERS } from '../data/initialData';
 
@@ -65,27 +65,24 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
   };
 
   return (
-    <section className="bg-[#F2F6FC] px-3 pt-3 pb-1">
+    <section className="bg-[#F2F6FC] sm:px-3 sm:pt-3 pb-1">
       <div
-        className="relative max-w-4xl mx-auto rounded-xl overflow-hidden bg-white shadow-sm border border-[#DCE7F7] group aspect-video"
+        className="relative max-w-4xl mx-auto sm:rounded-xl overflow-hidden bg-white shadow-xs group aspect-[2/1] sm:aspect-[21/9]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Sliding Track — Crisp 16:9 Banner Without Dark Shadow Scrim */}
+        {/* Sliding Track — Clean, Uncluttered Banner With Crisp Original Photo & Action Link */}
         <div
           className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${currentIndex * 100}%)` }}
         >
           {slides.map((slide) => {
             const slideTitle = language === 'en' ? slide.titleEn : slide.titleSw || slide.titleEn;
-            const slideSubtitle =
-              language === 'en' ? slide.subtitleEn : slide.subtitleSw || slide.subtitleEn;
-            const slideKicker =
-              language === 'en' ? slide.kickerEn : slide.kickerSw || slide.kickerEn;
-            const slideCta = language === 'en' ? slide.ctaEn : slide.ctaSw || slide.ctaEn;
-            const hasOverlayContent = Boolean(slideTitle || slideSubtitle || slideCta);
+            const slideCta =
+              (language === 'en' ? slide.ctaEn : slide.ctaSw || slide.ctaEn) ||
+              (language === 'en' ? 'Shop Now' : 'Tazama Sasa');
 
             return (
               <div
@@ -99,7 +96,7 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                     onSelectCategory(slide.targetCategory);
                   }
                 }}
-                className="w-full h-full shrink-0 relative aspect-video cursor-pointer bg-white"
+                className="w-full h-full shrink-0 relative aspect-[2/1] sm:aspect-[21/9] cursor-pointer bg-white"
               >
                 <img
                   src={slide.image}
@@ -108,43 +105,29 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                   className="w-full h-full object-cover object-center"
                 />
 
-                {/* Text, Short Description & CTA Button Directly Over Crisp Bright Image (No Dark Shadow Scrim) */}
-                {hasOverlayContent && (
-                  <div className="absolute inset-0 flex flex-col justify-center p-4 pb-8 sm:p-8 sm:pb-10 max-w-[82%] sm:max-w-[62%] space-y-1 sm:space-y-2.5 pointer-events-none">
-                    {slideKicker && (
-                      <span className="text-[9.5px] sm:text-[11px] font-extrabold tracking-wider text-[#29C5F6] uppercase [text-shadow:0_1px_4px_rgba(12,8,38,0.85)]">
-                        {slideKicker}
+                {/* Minimalist Overlay: Short Title (if set) + Clean ">>" Link Only */}
+                <div className="absolute inset-0 flex flex-col justify-end p-4 pb-7 sm:p-7 sm:pb-9 max-w-[78%] sm:max-w-[58%] space-y-2 pointer-events-none">
+                  {slideTitle && (
+                    <h2 className="text-[17px] sm:text-[26px] md:text-[30px] font-black text-white leading-[1.12] tracking-tight line-clamp-2 [text-shadow:0_2px_8px_rgba(12,8,38,0.75)]">
+                      {slideTitle}
+                    </h2>
+                  )}
+
+                  <div>
+                    <span className="inline-flex items-center gap-1 bg-white/95 text-[#0C0826] text-[11px] sm:text-xs font-extrabold px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-sm whitespace-nowrap">
+                      <span>{slideCta}</span>
+                      <span aria-hidden="true" className="tracking-tighter">
+                        &gt;&gt;
                       </span>
-                    )}
-
-                    {slideTitle && (
-                      <h2 className="text-[16px] sm:text-[26px] md:text-[32px] font-extrabold text-white leading-[1.15] tracking-tight text-balance [text-shadow:0_2px_8px_rgba(12,8,38,0.8)]">
-                        {slideTitle}
-                      </h2>
-                    )}
-
-                    {slideSubtitle && (
-                      <p className="text-[11px] sm:text-[13px] md:text-sm font-medium text-white leading-snug line-clamp-2 max-w-md [text-shadow:0_1px_6px_rgba(12,8,38,0.85)]">
-                        {slideSubtitle}
-                      </p>
-                    )}
-
-                    {slideCta && (
-                      <div className="pt-1 sm:pt-1.5">
-                        <span className="inline-flex items-center gap-1.5 bg-[#0B3B8C] hover:bg-[#1565C0] text-white text-[11px] sm:text-xs font-bold px-3.5 sm:px-4.5 py-1.5 sm:py-2 rounded-lg shadow-md border border-white/20 whitespace-nowrap">
-                          <span>{slideCta}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </span>
-                      </div>
-                    )}
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
         </div>
 
-        {/* Prev / Next Navigation Arrows */}
+        {/* Desktop Prev / Next Navigation Arrows */}
         {slides.length > 1 && (
           <>
             <button
@@ -154,7 +137,7 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                 goToPrev();
               }}
               aria-label="Previous promotion slide"
-              className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/70 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/65 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -166,13 +149,13 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                 goToNext();
               }}
               aria-label="Next promotion slide"
-              className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/45 hover:bg-black/70 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/65 text-white items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
 
-            {/* Bottom Pagination Dots */}
-            <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-black/35 backdrop-blur-xs px-2.5 py-1 rounded-full">
+            {/* Clean Bottom-Left Circular Pagination Dots */}
+            <div className="absolute bottom-2.5 left-4 flex items-center gap-1.5">
               {slides.map((slide, idx) => {
                 const isActive = idx === currentIndex;
                 return (
@@ -184,8 +167,8 @@ export const PromoBannerCarousel: React.FC<PromoBannerCarouselProps> = ({
                       setCurrentIndex(idx);
                     }}
                     aria-label={`Go to slide ${idx + 1}`}
-                    className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                      isActive ? 'w-5 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+                    className={`w-2 h-2 rounded-full transition-all cursor-pointer shadow-xs ${
+                      isActive ? 'bg-[#FF6B00] scale-110' : 'bg-white/90 hover:bg-white'
                     }`}
                   />
                 );

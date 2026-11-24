@@ -19,7 +19,7 @@ import { AdminSettings, CustomerProfile } from '../types';
 import { AuthModal } from './AuthModal';
 import { api, isOfficialAdminEmail } from '../services/api';
 import { OBBY_SOCIAL_LINKS, ObbyTechWordmark } from './ObbyTechBrand';
-import { readImageFileAsDataUrl } from '../utils/imageUpload';
+import { uploadImageFile } from '../utils/imageUpload';
 
 interface MyAppexViewProps {
   settings: AdminSettings;
@@ -462,12 +462,12 @@ export const MyAppexView: React.FC<MyAppexViewProps> = ({
     setPhotoError('');
     setIsUploadingPhoto(true);
     try {
-      const dataUrl = await readImageFileAsDataUrl(file, {
+      const imageUrl = await uploadImageFile(file, {
         maxDimension: 640,
-        maxRawBytes: 800_000,
-        quality: 0.9,
+        maxRawBytes: 500_000,
+        quality: 0.88,
       });
-      const res = await api.updateProfile({ photo: dataUrl });
+      const res = await api.updateProfile({ photo: imageUrl });
       onSaveProfile(res.user);
       setFormData(res.user);
       setProfileSavedMsg('Profile photo updated!');

@@ -1,10 +1,20 @@
+import { api } from '../services/api';
+
 const IMAGE_EXT_REGEX = /\.(jpe?g|png|webp|gif|bmp|svg|avif|heic|heif|jfif|tiff?|ico)$/i;
-const WEB_SAFE_IMAGE_DATA_URL_REGEX = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);base64,/i;
 
 export interface ImageUploadOptions {
   maxDimension?: number;
   maxRawBytes?: number;
   quality?: number;
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Unable to decode image.'));
+    img.src = src;
+  });
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -22,30 +32,61 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function loadImageElement(src: string): Promise<HTMLImageElement> {
+function canvasToBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Unable to decode image.'));
-    img.src = src;
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Image compression failed.'));
+      },
+      mime,
+      quality
+    );
   });
 }
 
-async function normalizeImageViaCanvas(
+function assertValidImageCandidate(file: File): void {
+  const isExplicitNonImageMime =
+    Boolean(file.type) &&
+    !file.type.startsWith('image/') &&
+    file.type !== 'application/octet-stream' &&
+    !IMAGE_EXT_REGEX.test(file.name);
+
+  if (isExplicitNonImageMime) {
+    throw new Error('Please choose a photo/image file (JPG, PNG, WebP, etc.).');
+  }
+}
+
+/**
+ * Optimizes large mobile camera photos into a lightweight Blob using low-RAM ObjectURLs,
+ * preventing mobile "out of memory / storage" errors when adding products or banners.
+ */
+async function processImageFileToBlob(
   file: File,
-  rawDataUrl: string,
-  maxDimension: number,
-  quality: number
-): Promise<string> {
+  options: ImageUploadOptions = {}
+): Promise<Blob> {
+  assertValidImageCandidate(file);
+
+  const maxDimension = options.maxDimension ?? 1600;
+  const maxRawBytes = options.maxRawBytes ?? 900_000;
+  const quality = options.quality ?? 0.9;
+
+  const isWebNativeMime =
+    file.type === 'image/jpeg' ||
+    file.type === 'image/jpg' ||
+    file.type === 'image/png' ||
+    file.type === 'image/webp' ||
+    file.type === 'image/gif' ||
+    file.type === 'image/svg+xml';
+
+  // Keep already-compact web-native files (including crisp banners & animated GIF/SVG) untouched
+  if (isWebNativeMime && file.size <= maxRawBytes) {
+    return file;
+  }
+
   const objectUrl = URL.createObjectURL(file);
   try {
-    let img: HTMLImageElement;
-    try {
-      img = await loadImageElement(objectUrl);
-    } catch {
-      img = await loadImageElement(rawDataUrl);
-    }
-
+    const img = await loadImageElement(objectUrl);
     const srcWidth = img.naturalWidth || img.width || 1200;
     const srcHeight = img.naturalHeight || img.height || 1200;
     const scale = Math.min(1, maxDimension / Math.max(srcWidth, srcHeight));
@@ -57,70 +98,58 @@ async function normalizeImageViaCanvas(
     canvas.height = targetHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      throw new Error('Image processing is not supported in this browser.');
+      return file;
     }
 
     ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
 
-    const hasAlphaCandidate =
+    const keepPng =
       file.type === 'image/png' ||
-      file.type === 'image/webp' ||
-      /\.png$/i.test(file.name) ||
-      /\.webp$/i.test(file.name);
+      /\.png$/i.test(file.name);
 
-    return hasAlphaCandidate
-      ? canvas.toDataURL('image/png')
-      : canvas.toDataURL('image/jpeg', quality);
+    const outputBlob = await canvasToBlob(
+      canvas,
+      keepPng ? 'image/png' : 'image/jpeg',
+      quality
+    );
+
+    // If PNG export stayed larger than maxRawBytes, fall back to crisp JPEG
+    if (keepPng && outputBlob.size > maxRawBytes * 1.5) {
+      return await canvasToBlob(canvas, 'image/jpeg', quality);
+    }
+
+    return outputBlob;
+  } catch {
+    if (file.type.startsWith('image/')) {
+      return file;
+    }
+    throw new Error('Selected file could not be loaded as an image. Please pick a valid photo.');
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
 }
 
 /**
- * Reads an image selected from any mobile gallery, WhatsApp folder, Downloads, or desktop.
- * Pairs with `<input type="file">` without restrictive `accept="image/*"` so mobile pickers
- * never gray out valid photos.
+ * Compresses/normalizes a selected phone or desktop image and uploads it directly to the server's
+ * `/uploads` file storage, returning a lightweight `/uploads/...` URL instead of storing megabytes in JSON.
+ */
+export async function uploadImageFile(
+  file: File,
+  options: ImageUploadOptions = {}
+): Promise<string> {
+  const blob = await processImageFileToBlob(file, options);
+  return await api.uploadImage(blob);
+}
+
+/**
+ * Legacy helper (kept for compatibility): reads/normalizes an image as a Data URL.
  */
 export async function readImageFileAsDataUrl(
   file: File,
   options: ImageUploadOptions = {}
 ): Promise<string> {
-  const maxDimension = options.maxDimension ?? 1920;
-  const maxRawBytes = options.maxRawBytes ?? 2_500_000;
-  const quality = options.quality ?? 0.92;
-
-  const isExplicitNonImageMime =
-    Boolean(file.type) &&
-    !file.type.startsWith('image/') &&
-    file.type !== 'application/octet-stream' &&
-    !IMAGE_EXT_REGEX.test(file.name);
-
-  if (isExplicitNonImageMime) {
-    throw new Error('Please choose a photo/image file (JPG, PNG, WebP, etc.).');
-  }
-
-  const rawDataUrl = await readFileAsDataUrl(file);
-
-  if (
-    /^data:image\/svg\+xml/i.test(rawDataUrl) &&
-    file.size <= maxRawBytes
-  ) {
-    return rawDataUrl;
-  }
-
-  if (
-    WEB_SAFE_IMAGE_DATA_URL_REGEX.test(rawDataUrl) &&
-    file.size <= maxRawBytes
-  ) {
-    return rawDataUrl;
-  }
-
-  try {
-    return await normalizeImageViaCanvas(file, rawDataUrl, maxDimension, quality);
-  } catch {
-    if (/^data:image\//i.test(rawDataUrl)) {
-      return rawDataUrl;
-    }
-    throw new Error('Selected file could not be loaded as an image. Please pick a valid photo.');
-  }
+  const blob = await processImageFileToBlob(file, options);
+  return await readFileAsDataUrl(
+    blob instanceof File ? blob : new File([blob], file.name || 'image.jpg', { type: blob.type })
+  );
 }

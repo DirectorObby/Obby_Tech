@@ -71,28 +71,15 @@ interface ServicesHomeBannerProps {
 
 export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
   language,
-  servicesCount,
   bannerConfig,
   onOpenServices,
 }) => {
-  const kicker =
-    bannerConfig?.kicker ||
-    (language === 'en'
-      ? 'OBBY TECH · TECHNICAL & CREATIVE STUDIO'
-      : 'OBBY TECH · HUDUMA ZA KITAALAMU');
   const headline =
     bannerConfig?.title ||
-    (language === 'en'
-      ? 'Professional Repairs, Graphic Design, Video & IT Solutions'
-      : 'Matengenezo ya Simu & Laptop, Ubunifu wa Picha, Video & Matangazo');
-  const subtitle =
-    bannerConfig?.subtitle ||
-    (language === 'en'
-      ? `Explore ${servicesCount} specialized service categories with real work samples, transparent prices, and instant appointment booking.`
-      : `Chunguza aina ${servicesCount} za huduma zetu ukiwa na picha za kazi zilizofanyika, maelezo kamili, bei, na booking ya moja kwa moja.`);
+    (language === 'en' ? 'Obby Tech Services' : 'Huduma za Obby Tech');
   const ctaText =
     bannerConfig?.ctaText ||
-    (language === 'en' ? 'View Our Services' : 'Tazama Huduma Zetu');
+    (language === 'en' ? 'View Services' : 'Tazama Huduma');
   const bgImage = bannerConfig?.imageUrl?.trim();
 
   return (
@@ -107,68 +94,31 @@ export const ServicesHomeBanner: React.FC<ServicesHomeBannerProps> = ({
             onOpenServices();
           }
         }}
-        className="relative overflow-hidden bg-[#0C0826] text-white border border-slate-800 shadow-sm cursor-pointer group"
+        className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0C0826] via-[#0B3B8C] to-[#0C0826] text-white shadow-sm cursor-pointer group aspect-[2/1] sm:aspect-[21/9]"
       >
-        {bgImage ? (
+        {bgImage && (
           <img
             src={bgImage}
             alt={headline}
             referrerPolicy="no-referrer"
             className="absolute inset-0 w-full h-full object-cover object-center opacity-100 group-hover:scale-[1.02] transition-transform duration-500"
           />
-        ) : (
-          <>
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 opacity-20 bg-[radial-gradient(#29C5F6_1px,transparent_1px)] [background-size:18px_18px] pointer-events-none"
-            />
-            <div
-              aria-hidden="true"
-              className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#24D164]/20 via-[#29C5F6]/15 to-transparent pointer-events-none"
-            />
-          </>
         )}
 
-        <div className="relative z-10 p-5 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-          <div className="space-y-2 max-w-xl">
-            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-[#29C5F6] [text-shadow:0_1px_4px_rgba(12,8,38,0.85)]">
-              {kicker}
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-snug [text-shadow:0_2px_8px_rgba(12,8,38,0.85)]">
+        <div className="relative z-10 h-full p-4 sm:p-7 flex flex-col justify-end max-w-[82%] sm:max-w-[60%] space-y-2">
+          {headline && (
+            <h2 className="text-[17px] sm:text-2xl font-black tracking-tight text-white leading-[1.15] line-clamp-2 [text-shadow:0_2px_8px_rgba(12,8,38,0.75)]">
               {headline}
             </h2>
-            <p className="text-xs sm:text-[13px] text-white/95 leading-relaxed [text-shadow:0_1px_6px_rgba(12,8,38,0.85)]">
-              {subtitle}
-            </p>
-          </div>
+          )}
 
-          <div className="flex flex-col items-start sm:items-end gap-2.5 shrink-0">
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="p-2 bg-white/10 border border-white/10 rounded-lg">
-                <Smartphone className="w-4 h-4" />
-              </span>
-              <span className="p-2 bg-white/10 border border-white/10 rounded-lg">
-                <Laptop className="w-4 h-4" />
-              </span>
-              <span className="p-2 bg-white/10 border border-white/10 rounded-lg">
-                <Palette className="w-4 h-4" />
-              </span>
-              <span className="p-2 bg-white/10 border border-white/10 rounded-lg">
-                <Camera className="w-4 h-4" />
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenServices();
-              }}
-              className="inline-flex items-center gap-2 bg-[#0B3B8C] hover:bg-[#1565C0] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-lg transition-all shadow-md group-hover:translate-x-0.5 whitespace-nowrap cursor-pointer"
-            >
+          <div>
+            <span className="inline-flex items-center gap-1 bg-white/95 group-hover:bg-white text-[#0C0826] text-[11px] sm:text-xs font-extrabold px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-sm whitespace-nowrap transition-colors">
               <span>{ctaText}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+              <span aria-hidden="true" className="tracking-tighter">
+                &gt;&gt;
+              </span>
+            </span>
           </div>
         </div>
       </div>

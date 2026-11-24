@@ -87,6 +87,16 @@ const getAuthHeaders = (): Record<string, string> => {
   return headers;
 };
 
+async function parseJsonSafe(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: res.status === 413 ? 'Image size is too large.' : text.slice(0, 140) };
+  }
+}
+
 export interface AuthResponse {
   success: boolean;
   user: CustomerProfile;
@@ -97,6 +107,25 @@ export interface AuthResponse {
 }
 
 export const api = {
+  uploadImage: async (fileOrBlob: Blob): Promise<string> => {
+    const headers: Record<string, string> = {
+      'Content-Type': fileOrBlob.type || 'application/octet-stream',
+    };
+    if (inMemorySessionToken) {
+      headers['Authorization'] = `Bearer ${inMemorySessionToken}`;
+    }
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers,
+      body: fileOrBlob,
+    });
+    const data = await parseJsonSafe(res);
+    if (!res.ok || !data?.url) {
+      throw new Error(data?.error || 'Failed to upload image.');
+    }
+    return data.url;
+  },
+
   // Auth API
   googleAuth: async (tokenPayload: { idToken?: string; accessToken?: string; credential?: string }): Promise<AuthResponse> => {
     const res = await fetch('/api/auth/google', {

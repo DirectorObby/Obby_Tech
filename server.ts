@@ -29,9 +29,14 @@ import firebaseConfig from './firebase-applet-config.json';
 
 const PORT = 3000;
 const DB_PATH = path.join(process.cwd(), 'db.json');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const OFFICIAL_ADMIN_EMAIL = 'obbyitmasters@gmail.com';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 export interface UserAccount {
   id: string;
@@ -119,6 +124,85 @@ function isSafeImageOrUrl(url?: string): boolean {
     return true;
   }
   return false;
+}
+
+function extensionFromMimeSubtype(subtype: string): string {
+  const lower = subtype.toLowerCase();
+  if (lower === 'jpeg' || lower === 'jpg' || lower === 'pjpeg') return 'jpg';
+  if (lower === 'png') return 'png';
+  if (lower === 'webp') return 'webp';
+  if (lower === 'gif') return 'gif';
+  if (lower === 'svg+xml') return 'svg';
+  if (lower === 'bmp') return 'bmp';
+  if (lower === 'avif') return 'avif';
+  if (lower === 'heic' || lower === 'heif') return lower;
+  if (lower === 'x-icon' || lower === 'vnd.microsoft.icon') return 'ico';
+  return 'jpg';
+}
+
+function detectImageExtensionFromBuffer(buf: Buffer, contentType?: string): string {
+  if (buf.length >= 4) {
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return 'gif';
+    if (buf[0] === 0x42 && buf[1] === 0x4d) return 'bmp';
+    if (
+      buf.length >= 12 &&
+      buf.toString('ascii', 0, 4) === 'RIFF' &&
+      buf.toString('ascii', 8, 12) === 'WEBP'
+    ) {
+      return 'webp';
+    }
+    const headStr = buf.subarray(0, 200).toString('utf8').trimStart();
+    if (headStr.startsWith('<svg') || headStr.startsWith('<?xml')) return 'svg';
+  }
+  if (contentType && contentType.startsWith('image/')) {
+    return extensionFromMimeSubtype(contentType.slice(6).split(';')[0].trim());
+  }
+  return 'jpg';
+}
+
+function saveImageBufferToUploads(buf: Buffer, ext: string, prefix = 'img'): string {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '') || 'img';
+  const filename = `${safePrefix}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}.${ext}`;
+  const fullPath = path.join(UPLOADS_DIR, filename);
+  fs.writeFileSync(fullPath, buf);
+  return `/uploads/${filename}`;
+}
+
+function persistDataUrlToUploads(
+  value?: string,
+  prefix = 'img',
+  dedupeCache?: Map<string, string>
+): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!trimmed.startsWith('data:image/')) return trimmed;
+
+  if (dedupeCache && dedupeCache.has(trimmed)) {
+    return dedupeCache.get(trimmed)!;
+  }
+
+  const match = trimmed.match(
+    /^data:image\/([a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/=\s]+)$/i
+  );
+  if (!match) return trimmed;
+
+  try {
+    const ext = extensionFromMimeSubtype(match[1]);
+    const buf = Buffer.from(match[2].replace(/\s+/g, ''), 'base64');
+    if (buf.length === 0) return trimmed;
+    const urlPath = saveImageBufferToUploads(buf, ext, prefix);
+    dedupeCache?.set(trimmed, urlPath);
+    return urlPath;
+  } catch (err) {
+    console.error('Failed to persist data URL image to uploads:', err);
+    return trimmed;
+  }
 }
 
 function getPaymentNumberForMethod(paymentMethod: string, settings: AdminSettings): string {
@@ -298,11 +382,71 @@ function loadDatabase(): DatabaseState {
     };
   });
 
+  const dedupeCache = new Map<string, string>();
+  const migrateImg = (val: string | undefined, prefix: string): string => {
+    if (!val || !val.trim().startsWith('data:image/')) return val || '';
+    const migrated = persistDataUrlToUploads(val, prefix, dedupeCache);
+    if (migrated !== val) needsSave = true;
+    return migrated;
+  };
+
+  const migratedProducts: Product[] = (
+    Array.isArray(loaded.products) && loaded.products.length > 0 ? loaded.products : INITIAL_PRODUCTS
+  ).map((p) => {
+    const nextImages = Array.isArray(p.images)
+      ? p.images.map((img) => migrateImg(img, 'prod'))
+      : [];
+    const nextPrimary = migrateImg(p.primaryImage, 'prod') || nextImages[0] || '';
+    return {
+      ...p,
+      images: nextImages,
+      primaryImage: nextPrimary,
+    };
+  });
+
+  const migratedCategories: CategoryItem[] = mergeCategories(loaded.categories).map((c) => ({
+    ...c,
+    icon: c.iconType === 'image' || c.icon?.startsWith('data:image/') ? migrateImg(c.icon, 'caticon') : c.icon,
+    imageUrl: migrateImg(c.imageUrl, 'cat'),
+  }));
+
+  const migratedBanners: PromoBanner[] = (
+    Array.isArray(loaded.banners) && loaded.banners.length > 0 ? loaded.banners : INITIAL_BANNERS
+  ).map((b) => ({
+    ...b,
+    image: migrateImg(b.image, 'banner'),
+  }));
+
+  const migratedServices: ServiceItem[] = mergedServices.map((srv) => ({
+    ...srv,
+    coverImage: migrateImg(srv.coverImage, 'srv'),
+    showcaseItems: (srv.showcaseItems || []).map((item) => ({
+      ...item,
+      image: migrateImg(item.image, 'srvitem'),
+    })),
+  }));
+
+  const migratedSettings: AdminSettings = {
+    ...settings,
+    websiteLogo: migrateImg(settings.websiteLogo, 'logo'),
+    servicesBanner: settings.servicesBanner
+      ? {
+          ...settings.servicesBanner,
+          imageUrl: migrateImg(settings.servicesBanner.imageUrl, 'svcbanner'),
+        }
+      : settings.servicesBanner,
+  };
+
+  const migratedUsers: UserAccount[] = users.map((u) => ({
+    ...u,
+    photo: migrateImg(u.photo, 'avatar'),
+  }));
+
   const state: DatabaseState = {
-    products: Array.isArray(loaded.products) && loaded.products.length > 0 ? loaded.products : INITIAL_PRODUCTS,
-    categories: mergeCategories(loaded.categories),
-    services: mergedServices,
-    banners: Array.isArray(loaded.banners) && loaded.banners.length > 0 ? loaded.banners : INITIAL_BANNERS,
+    products: migratedProducts,
+    categories: migratedCategories,
+    services: migratedServices,
+    banners: migratedBanners,
     bookings: Array.isArray(loaded.bookings) ? loaded.bookings : [],
     aiInstructions:
       Array.isArray(loaded.aiInstructions) && loaded.aiInstructions.length > 0
@@ -310,11 +454,11 @@ function loadDatabase(): DatabaseState {
         : INITIAL_AI_INSTRUCTIONS,
     orders: Array.isArray(loaded.orders) ? loaded.orders : [],
     notifications: Array.isArray(loaded.notifications) ? loaded.notifications : [],
-    settings,
+    settings: migratedSettings,
     adminEmail,
     adminPasswordHash,
     adminMustChangePassword,
-    users,
+    users: migratedUsers,
     sessions: Array.isArray(loaded.sessions)
       ? loaded.sessions.filter((s) => s.expiresAt > Date.now())
       : [],
@@ -445,8 +589,47 @@ const ai = geminiApiKey
 async function startServer() {
   const app = express();
 
-  app.use(express.json({ limit: '25mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  // Serve uploaded image assets cleanly from disk (keeps db.json small and fast)
+  app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
+
+  // Binary or JSON image upload endpoint (up to 50MB per image)
+  app.post(
+    '/api/upload',
+    requireAuth,
+    express.raw({ type: ['image/*', 'application/octet-stream'], limit: '50mb' }),
+    (req, res, next) => {
+      if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+        const contentType = req.headers['content-type'] || '';
+        const ext = detectImageExtensionFromBuffer(req.body, contentType);
+        const url = saveImageBufferToUploads(req.body, ext, 'up');
+        return res.status(201).json({ success: true, url });
+      }
+      return next();
+    }
+  );
+
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Fallback JSON handler for /api/upload when sent as { dataUrl }
+  app.post('/api/upload', requireAuth, (req, res) => {
+    const dataUrl = typeof req.body?.dataUrl === 'string' ? req.body.dataUrl : '';
+    if (!dataUrl || !isSafeImageOrUrl(dataUrl)) {
+      return res.status(400).json({ error: 'Valid image data is required.' });
+    }
+    const url = persistDataUrlToUploads(dataUrl, 'up');
+    return res.status(201).json({ success: true, url });
+  });
+
+  // Always return JSON for oversized payloads instead of HTML error pages
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err?.type === 'entity.too.large' || err?.status === 413) {
+      return res.status(413).json({
+        error: 'Uploaded image payload is too large. Please try uploading fewer large images at once.',
+      });
+    }
+    return next(err);
+  });
 
   // Health check
   app.get('/api/health', (_req, res) => {
@@ -512,7 +695,7 @@ async function startServer() {
         description: String(item.description || '').trim(),
         price: item.price !== undefined && item.price !== '' ? Number(item.price) : undefined,
         priceLabel: item.priceLabel ? String(item.priceLabel).trim() : '',
-        image: String(item.image || '').trim(),
+        image: persistDataUrlToUploads(String(item.image || '').trim(), 'srvitem'),
       }));
 
     const slugBase = String(title)
@@ -527,7 +710,7 @@ async function startServer() {
       description: String(description || '').trim(),
       iconName: iconName || 'Sparkles',
       requiresDeviceDetails: Boolean(requiresDeviceDetails),
-      coverImage: coverImage ? String(coverImage).trim() : '',
+      coverImage: persistDataUrlToUploads(coverImage ? String(coverImage).trim() : '', 'srv'),
       showcaseItems: sanitizedShowcase,
     };
 
@@ -564,7 +747,7 @@ async function startServer() {
             ? Number(item.price)
             : undefined,
           priceLabel: item.priceLabel ? String(item.priceLabel).trim() : '',
-          image: String(item.image || '').trim(),
+          image: persistDataUrlToUploads(String(item.image || '').trim(), 'srvitem'),
         }));
     }
 
@@ -577,7 +760,10 @@ async function startServer() {
         req.body.requiresDeviceDetails !== undefined
           ? Boolean(req.body.requiresDeviceDetails)
           : existing.requiresDeviceDetails,
-      coverImage: req.body.coverImage !== undefined ? String(req.body.coverImage).trim() : existing.coverImage,
+      coverImage:
+        req.body.coverImage !== undefined
+          ? persistDataUrlToUploads(String(req.body.coverImage).trim(), 'srv')
+          : existing.coverImage,
       showcaseItems: updatedShowcase,
     };
 
@@ -621,8 +807,13 @@ async function startServer() {
       return res.status(400).json({ error: 'Name, category, and price are required' });
     }
 
-    const sanitizedImages = (Array.isArray(images) ? images : []).filter((img: string) => isSafeImageOrUrl(img));
-    const safePrimary = isSafeImageOrUrl(primaryImage) ? primaryImage : '';
+    const reqDedupe = new Map<string, string>();
+    const sanitizedImages = (Array.isArray(images) ? images : [])
+      .filter((img: string) => isSafeImageOrUrl(img))
+      .map((img: string) => persistDataUrlToUploads(img, 'prod', reqDedupe));
+    const safePrimary = isSafeImageOrUrl(primaryImage)
+      ? persistDataUrlToUploads(primaryImage, 'prod', reqDedupe)
+      : '';
 
     const newProduct: Product = {
       id: `apx-${Date.now()}`,
@@ -663,13 +854,16 @@ async function startServer() {
     }
 
     const existing = db.products[index];
+    const reqDedupe = new Map<string, string>();
     const updatedStock = req.body.stock !== undefined ? Number(req.body.stock) : existing.stock;
     const incomingImages = Array.isArray(req.body.images)
-      ? req.body.images.filter((img: string) => isSafeImageOrUrl(img))
+      ? req.body.images
+          .filter((img: string) => isSafeImageOrUrl(img))
+          .map((img: string) => persistDataUrlToUploads(img, 'prod', reqDedupe))
       : existing.images;
     const safePrimary =
       req.body.primaryImage && isSafeImageOrUrl(req.body.primaryImage)
-        ? req.body.primaryImage
+        ? persistDataUrlToUploads(req.body.primaryImage, 'prod', reqDedupe)
         : existing.primaryImage;
 
     const updatedProduct: Product = {
@@ -725,9 +919,6 @@ async function startServer() {
     if (!image || !isSafeImageOrUrl(image)) {
       return res.status(400).json({ error: 'A valid banner image is required' });
     }
-    if (!titleEn) {
-      return res.status(400).json({ error: 'Banner title is required' });
-    }
 
     const now = new Date().toISOString();
     const nextOrder =
@@ -735,16 +926,19 @@ async function startServer() {
         ? Number(order)
         : db.banners.reduce((max, b) => Math.max(max, b.order || 0), 0) + 1;
 
+    const cleanTitleEn = String(titleEn || '').trim();
+    const cleanTitleSw = String(titleSw || cleanTitleEn).trim();
+
     const newBanner: PromoBanner = {
       id: `banner-${Date.now()}`,
-      image,
-      kickerEn: String(kickerEn || 'OBBY TECH · FEATURED'),
-      kickerSw: String(kickerSw || kickerEn || 'OBBY TECH · OFA MAALUM'),
-      titleEn: String(titleEn).trim(),
-      titleSw: String(titleSw || titleEn).trim(),
+      image: persistDataUrlToUploads(image, 'banner'),
+      kickerEn: String(kickerEn || ''),
+      kickerSw: String(kickerSw || kickerEn || ''),
+      titleEn: cleanTitleEn,
+      titleSw: cleanTitleSw,
       subtitleEn: String(subtitleEn || ''),
       subtitleSw: String(subtitleSw || subtitleEn || ''),
-      ctaEn: String(ctaEn || 'Explore Now'),
+      ctaEn: String(ctaEn || 'Shop Now'),
       ctaSw: String(ctaSw || ctaEn || 'Tazama Sasa'),
       targetCategory: targetCategory || 'All',
       enabled: enabled !== false,
@@ -771,7 +965,7 @@ async function startServer() {
 
     const updated: PromoBanner = {
       ...existing,
-      image: req.body.image || existing.image,
+      image: req.body.image ? persistDataUrlToUploads(req.body.image, 'banner') : existing.image,
       kickerEn: req.body.kickerEn !== undefined ? String(req.body.kickerEn) : existing.kickerEn,
       kickerSw: req.body.kickerSw !== undefined ? String(req.body.kickerSw) : existing.kickerSw,
       titleEn: req.body.titleEn !== undefined ? String(req.body.titleEn) : existing.titleEn,
@@ -820,9 +1014,17 @@ async function startServer() {
 
     const updated: CategoryItem = {
       ...existing,
-      icon: icon !== undefined ? String(icon) : existing.icon,
+      icon:
+        icon !== undefined
+          ? (iconType === 'image' || String(icon).startsWith('data:image/')
+              ? persistDataUrlToUploads(String(icon), 'caticon')
+              : String(icon))
+          : existing.icon,
       iconType: iconType || existing.iconType || 'emoji',
-      imageUrl: imageUrl !== undefined ? String(imageUrl) : existing.imageUrl,
+      imageUrl:
+        imageUrl !== undefined
+          ? persistDataUrlToUploads(String(imageUrl), 'cat')
+          : existing.imageUrl,
       description: description !== undefined ? String(description) : existing.description,
     };
 
@@ -891,9 +1093,25 @@ async function startServer() {
     if (req.body.servicesBanner?.imageUrl && !isSafeImageOrUrl(req.body.servicesBanner.imageUrl)) {
       return res.status(400).json({ error: 'Invalid services banner image URL' });
     }
+    const cleanWebsiteLogo =
+      req.body.websiteLogo !== undefined
+        ? persistDataUrlToUploads(String(req.body.websiteLogo), 'logo')
+        : db.settings.websiteLogo;
+    const cleanServicesBanner = req.body.servicesBanner
+      ? {
+          ...(db.settings.servicesBanner || INITIAL_ADMIN_SETTINGS.servicesBanner!),
+          ...req.body.servicesBanner,
+          imageUrl:
+            req.body.servicesBanner.imageUrl !== undefined
+              ? persistDataUrlToUploads(String(req.body.servicesBanner.imageUrl), 'svcbanner')
+              : db.settings.servicesBanner?.imageUrl,
+        }
+      : db.settings.servicesBanner;
+
     db.settings = {
       ...db.settings,
       ...req.body,
+      websiteLogo: cleanWebsiteLogo,
       paymentSettings: req.body.paymentSettings
         ? { ...db.settings.paymentSettings, ...req.body.paymentSettings }
         : db.settings.paymentSettings,
@@ -903,9 +1121,7 @@ async function startServer() {
       deliverySettings: req.body.deliverySettings
         ? { ...db.settings.deliverySettings, ...req.body.deliverySettings }
         : db.settings.deliverySettings,
-      servicesBanner: req.body.servicesBanner
-        ? { ...(db.settings.servicesBanner || INITIAL_ADMIN_SETTINGS.servicesBanner!), ...req.body.servicesBanner }
-        : db.settings.servicesBanner,
+      servicesBanner: cleanServicesBanner,
     };
     saveDatabase();
     res.json(db.settings);
@@ -1135,7 +1351,7 @@ async function startServer() {
       if (!trimmedPhoto) {
         user.photo = '';
       } else if (isSafeImageOrUrl(trimmedPhoto)) {
-        user.photo = trimmedPhoto;
+        user.photo = persistDataUrlToUploads(trimmedPhoto, 'avatar');
       } else {
         return res.status(400).json({ error: 'Invalid profile photo image.' });
       }
