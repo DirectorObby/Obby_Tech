@@ -306,7 +306,7 @@ service cloud.firestore {
     // Public Storefront Product Catalog
     match /products/{productId} {
       allow get: if isValidId(productId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isVerifiedUser()
         && isValidId(productId)
         && isValidProduct(incoming())
@@ -330,7 +330,7 @@ service cloud.firestore {
     // Storefront Categories
     match /categories/{categoryId} {
       allow get: if isValidId(categoryId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isVerifiedUser()
         && isValidId(categoryId)
         && isValidCategory(incoming())
@@ -355,7 +355,7 @@ service cloud.firestore {
     // Storefront Services
     match /services/{serviceId} {
       allow get: if isValidId(serviceId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isVerifiedUser()
         && isValidId(serviceId)
         && isValidService(incoming())
@@ -379,7 +379,7 @@ service cloud.firestore {
     // Promotional 16:9 Home Banners
     match /banners/{bannerId} {
       allow get: if isValidId(bannerId);
-      allow list: if resource.data.id is string;
+      allow list: if true;
       allow create: if isVerifiedUser()
         && isValidId(bannerId)
         && isValidBanner(incoming())
